@@ -25,3 +25,4 @@ No legacy `JPDB_PLAYER_REGISTER` message is emitted by this frontend. Deploy the
 
 Run focused verification with `node --test dashboard-view.test.mjs`.
 
+After a successful profile save, Wix may send `JPDB_PROFILE_EDITOR_SAVED` with `canContinueToEvent: true` when validated event context remains in the URL or session. The private dashboard then offers an explicit Continue button that sends `JPDB_PROFILE_CONTINUE_EVENT` with a request ID. The profile page requires a successful save in this page session before calling the API owner's `returnToEventAfterProfileSave` helper. Saving alone never navigates, registers or pays. This depends on the coordinated `public/eventRegistrationBridge.js` and `public/eventRegistrationPage.js` modules from the registration owner.

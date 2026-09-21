@@ -25,6 +25,7 @@ let embedded = window.parent !== window;
 let loadTimer;
 let publicView = location.hash.startsWith('#/player/') || location.hash.includes('preview-public');
 let publicUrl = '';
+let canContinueToEvent = false;
 let parentOrigin = '*';
 function trustedOrigin(origin) {
   try { const url = new URL(origin); return url.protocol === 'https:' && ['www.jouerpourdebon.ca', 'jouerpourdebon.ca', 'editor.wix.com', 'yellowpagescanada-website-10110.editor.wix.com'].includes(url.hostname); }
@@ -70,9 +71,10 @@ function normalized(payload) {
   return { ...payload, profile, dashboard, games: Array.isArray(payload?.games) ? payload.games : [] };
 }
 function renderDashboard() {
-  app.innerHTML = dashboardHtml(data, { publicView, preview: isPreview(), publicUrl });
+  app.innerHTML = dashboardHtml(data, { publicView, preview: isPreview(), publicUrl, canContinueToEvent });
   if (publicView) return;
   app.querySelector('#edit').addEventListener('click', renderEditor);
+  app.querySelector('#continue-event')?.addEventListener('click', () => dashboardAction('JPDB_PROFILE_CONTINUE_EVENT', {}));
   app.querySelector('#refresh-dashboard').addEventListener('click', () => { if (!isPreview()) requestData(); });
   app.querySelectorAll('.invitation-response').forEach(button => button.addEventListener('click', () => {
     dashboardAction('JPDB_PLAYER_INVITATION_RESPONSE', { invitationId: button.dataset.invitation, response: button.dataset.response });
@@ -124,7 +126,7 @@ function startPrivateProfile() {
       } else if (result.success) { requestData(); }
       else { status.textContent = result.code === 'PAYMENT_NOT_CONFIGURED' ? 'Le paiement en ligne n’est pas encore disponible. Votre inscription reste en attente de paiement.' : 'Impossible de compléter cette demande. Vérifiez votre profil et actualisez les événements avant de réessayer.'; }
     }
-    if (event.data.type === MESSAGE.saved) { editing = false; requestData(); }
+    if (event.data.type === MESSAGE.saved) { editing = false; canContinueToEvent = event.data.canContinueToEvent === true; requestData(); }
     if (event.data.type === MESSAGE.error) { clearTimeout(loadTimer); app.innerHTML = `<div class="shell center"><div class="card"><h1>Impossible de charger le profil</h1><p>${escapeHtml(event.data.message || 'Réessayez plus tard.')}</p></div></div>`; }
   });
   window.parent.postMessage({ type: MESSAGE.ready }, parentOrigin); requestData();

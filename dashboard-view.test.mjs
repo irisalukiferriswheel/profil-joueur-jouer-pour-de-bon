@@ -14,6 +14,11 @@ test('public HTML excludes all private event and payment details', () => {
 
 const registrationUrl = 'https://www.jouerpourdebon.ca/competitions?jpdbEvent=11111111-1111-4111-8111-111111111111';
 const invitation = { invitationId: 'invite-1', invitationStatus: 'sent', canRegister: true, title: 'Invitation privée', registrationUrl };
+test('post-save continuation is only offered explicitly in the private view', () => {
+  assert.doesNotMatch(dashboardHtml(data), /id="continue-event"/);
+  assert.match(dashboardHtml(data, { canContinueToEvent: true }), /id="continue-event"/);
+  assert.doesNotMatch(dashboardHtml(data, { publicView: true, canContinueToEvent: true }), /id="continue-event"/);
+});
 test('pending invitation exposes response buttons but no registration or payment action', () => {
   const html = dashboardHtml({ ...data, schedule: [], invitations: [invitation] });
   assert.match(html, /data-response="accepted"/);
