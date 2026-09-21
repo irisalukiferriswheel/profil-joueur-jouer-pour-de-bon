@@ -13,5 +13,15 @@ After GitHub Pages is enabled, set the HTML component source to:
 
 Set its Wix element ID to `playerDashboardEmbed`.
 
-The page-code bridge must use the same message types and call `getMyPlayerOnboardingForm` / `savePlayerOnboarding` from `backend/playerOnboarding.web`.
+The page-code bridge uses `getMyPlayerDashboard` / `getPublicPlayerDashboard` and the SiteMember methods in `backend/playerDashboard.web`, plus `savePlayerOnboarding` for existing profile edits.
+
+## Invitation responses
+
+Pending invitations show separate Accept and Decline buttons. The iframe emits `JPDB_PLAYER_INVITATION_RESPONSE` with `{requestId,payload:{invitationId,response:'accepted'|'declined'}}`. Wix derives the current member identity and calls `POST /v1/wix/invitations/:id/respond`, then replies with `JPDB_PLAYER_ACTION_RESULT` and the matching request ID. Success only refreshes dashboard data; it never registers, creates checkout, or charges the player.
+
+The dashboard returns `invitationStatus` and `canRegister` for each invitation. Accepted invitations show the separate registration link only when `canRegister === true` and the server-provided `registrationUrl` is on `https://www.jouerpourdebon.ca/competitions?jpdbEvent=<event UUID>`. The event UUID must come from the API; a competition ID is not an event ID. The registration page rechecks invitation/access rules. Declined/revoked invitations are omitted by the API and have no actions if present in an old response.
+
+No legacy `JPDB_PLAYER_REGISTER` message is emitted by this frontend. Deploy the matching API and Wix bridge before releasing the frontend. Preview mode changes fictional invitation state only and cannot create a real invitation, registration or payment.
+
+Run focused verification with `node --test dashboard-view.test.mjs`.
 

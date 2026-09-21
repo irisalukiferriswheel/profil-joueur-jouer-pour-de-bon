@@ -31,20 +31,32 @@ function trustedOrigin(origin) {
   catch { return false; }
 }
 let activeRequest = null;
+let activeAction = null;
 let actionTimer;
 
 function dashboardAction(type, payload) {
   if (activeRequest) return;
   const status = app.querySelector('#action-status');
-  if (isPreview()) { status.textContent = 'Démonstration uniquement : aucune inscription ni aucun paiement effectué.'; return; }
+  if (isPreview()) {
+    if (type === 'JPDB_PLAYER_INVITATION_RESPONSE') {
+      const invitation = data.invitations.find(item => item.invitationId === payload.invitationId);
+      if (invitation && payload.response === 'accepted') invitation.invitationStatus = 'accepted';
+      if (payload.response === 'declined') data.invitations = data.invitations.filter(item => item.invitationId !== payload.invitationId);
+      renderDashboard();
+    }
+    app.querySelector('#action-status').textContent = 'Démonstration uniquement : aucune inscription ni aucun paiement effectué.';
+    return;
+  }
   activeRequest = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  app.querySelectorAll('.invitation-form button,.checkout-button').forEach(button => { button.disabled = true; });
+  activeAction = type;
+  app.querySelectorAll('.invitation-response,.checkout-button').forEach(button => { button.disabled = true; });
   status.textContent = 'Traitement en cours…';
   window.parent.postMessage({ type, requestId: activeRequest, payload }, parentOrigin);
   actionTimer = setTimeout(() => {
     activeRequest = null;
+    activeAction = null;
     status.textContent = 'La réponse prend du temps. Actualisez votre calendrier avant de réessayer.';
-    app.querySelectorAll('.invitation-form button,.checkout-button').forEach(button => { button.disabled = false; });
+    app.querySelectorAll('.invitation-response,.checkout-button').forEach(button => { button.disabled = false; });
   }, 30000);
 }
 
@@ -62,9 +74,8 @@ function renderDashboard() {
   if (publicView) return;
   app.querySelector('#edit').addEventListener('click', renderEditor);
   app.querySelector('#refresh-dashboard').addEventListener('click', () => { if (!isPreview()) requestData(); });
-  app.querySelectorAll('.invitation-form').forEach(form => form.addEventListener('submit', event => {
-    event.preventDefault();
-    dashboardAction('JPDB_PLAYER_REGISTER', { invitationId: form.dataset.invitation, competitionId: form.dataset.competition, customCauseName: new FormData(form).get('cause') });
+  app.querySelectorAll('.invitation-response').forEach(button => button.addEventListener('click', () => {
+    dashboardAction('JPDB_PLAYER_INVITATION_RESPONSE', { invitationId: button.dataset.invitation, response: button.dataset.response });
   }));
   app.querySelectorAll('.checkout-button').forEach(button => button.addEventListener('click', () => dashboardAction('JPDB_PLAYER_CHECKOUT', { registrationId: button.dataset.registration })));
 }
@@ -98,12 +109,16 @@ function startPrivateProfile() {
     if (event.data.type === MESSAGE.data) { clearTimeout(loadTimer); publicView = event.data.publicView === true; publicUrl = event.data.publicUrl || ''; data = normalized(event.data.payload); renderDashboard(); }
     if (event.data.type === 'JPDB_PLAYER_ACTION_RESULT' && event.data.requestId === activeRequest) {
       clearTimeout(actionTimer);
+      const action = activeAction;
       activeRequest = null;
+      activeAction = null;
       const result = event.data.payload || {};
       const status = app.querySelector('#action-status');
       if (!status) return;
-      app.querySelectorAll('.invitation-form button,.checkout-button').forEach(button => { button.disabled = false; });
-      if (result.success && result.checkoutUrl && /^https:\/\//.test(result.checkoutUrl)) {
+      app.querySelectorAll('.invitation-response,.checkout-button').forEach(button => { button.disabled = false; });
+      if (result.success && action === 'JPDB_PLAYER_INVITATION_RESPONSE') {
+        requestData();
+      } else if (result.success && result.checkoutUrl && /^https:\/\//.test(result.checkoutUrl)) {
         status.textContent = 'Votre paiement sécurisé est prêt. Après le paiement, actualisez votre calendrier. ';
         const link = document.createElement('a'); link.href = result.checkoutUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Continuer vers le paiement ↗'; status.append(link);
       } else if (result.success) { requestData(); }

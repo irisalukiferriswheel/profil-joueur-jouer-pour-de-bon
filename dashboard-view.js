@@ -17,11 +17,25 @@ function location(event) {
     ${['physical', 'hybrid'].includes(event.locationType) ? `<p>${escape(event.locationName || '')}${event.address ? `<br>${escape(event.address)}` : '<br>Adresse à confirmer'}</p>${map ? `<a href="${escape(map)}" target="_blank" rel="noopener noreferrer">Voir la carte ↗</a>` : ''}` : ''}
     ${['online', 'hybrid'].includes(event.locationType) ? (join ? `<a class="join-link" href="${escape(join)}" target="_blank" rel="noopener noreferrer">Rejoindre l’événement ↗</a>` : `<p class="muted">${event.registrationStatus === 'confirmed' ? 'Le lien sera communiqué ici.' : 'Lien disponible après confirmation.'}</p>`) : ''}`;
 }
+function invitationActions(event) {
+  const status = event.invitationStatus || 'sent';
+  if (status === 'accepted') {
+    const url = safeUrl(event.registrationUrl);
+    let registrationUrl = '';
+    if (url && event.canRegister === true) {
+      const parsed = new URL(url);
+      if (parsed.origin === 'https://www.jouerpourdebon.ca' && parsed.pathname === '/competitions' && /^[0-9a-f-]{36}$/i.test(parsed.searchParams.get('jpdbEvent') || '')) registrationUrl = parsed.href;
+    }
+    return `<div class="invitation-actions"><p>Invitation acceptée. Votre inscription et votre paiement restent à compléter séparément.</p>${registrationUrl ? `<a class="primary" href="${escape(registrationUrl)}" target="_blank" rel="noopener noreferrer">Continuer vers l’inscription ↗</a>` : '<p class="muted">Le lien d’inscription sera disponible ici.</p>'}</div>`;
+  }
+  if (!['created', 'sent'].includes(status)) return '<p class="muted">Cette invitation n’est plus disponible.</p>';
+  return `<div class="invitation-actions"><p>Accepter cette invitation ne vous inscrit pas et ne déclenche aucun paiement.</p><div class="invitation-buttons"><button type="button" class="primary invitation-response" data-invitation="${escape(event.invitationId)}" data-response="accepted">Accepter</button><button type="button" class="link invitation-response" data-invitation="${escape(event.invitationId)}" data-response="declined">Décliner</button></div></div>`;
+}
 function eventCard(event, invited) {
-  return `<article class="event-card"><div class="event-heading"><h3>${escape(event.title)}</h3><span class="pill">${invited ? 'Invitation' : event.registrationStatus === 'confirmed' ? 'Inscription confirmée' : 'Paiement à compléter'}</span></div>
+  return `<article class="event-card"><div class="event-heading"><h3>${escape(event.title)}</h3><span class="pill">${invited ? event.invitationStatus === 'accepted' ? 'Invitation acceptée' : 'Invitation' : event.registrationStatus === 'confirmed' ? 'Inscription confirmée' : 'Paiement à compléter'}</span></div>
     <p class="event-date">${escape(date(event))}</p>${location(event)}
     <div class="event-footer"><strong>${money(event.feeAmount, event.currency)} <small>de participation</small></strong>
-    ${invited ? `<form class="invitation-form" data-invitation="${escape(event.invitationId)}" data-competition="${escape(event.competitionId)}"><label>La cause pour laquelle je joue<input name="cause" maxlength="200" required placeholder="Nom de la cause"></label><button class="primary" type="submit">Choisir cet événement</button></form>` : event.registrationStatus === 'pending_payment' ? `<button class="primary checkout-button" data-registration="${escape(event.registrationId)}">Payer ma participation</button>` : ''}</div></article>`;
+    ${invited ? invitationActions(event) : event.registrationStatus === 'pending_payment' ? `<button class="primary checkout-button" data-registration="${escape(event.registrationId)}">Payer ma participation</button>` : ''}</div></article>`;
 }
 export function dashboardHtml(data, { publicView = false, preview = false, publicUrl = '' } = {}) {
   const impact = data.dashboard || {};
