@@ -1,4 +1,6 @@
+import { dashboardHtml } from './dashboard-view.js';
 const app = document.querySelector('#app');
+const previewMode = location.hash.includes('preview-profile') || location.hash.includes('preview-public');
 const MESSAGE = {
   ready: 'JPDB_PROFILE_EDITOR_READY', request: 'JPDB_PROFILE_EDITOR_REQUEST_DATA',
   data: 'JPDB_PROFILE_EDITOR_DATA', save: 'JPDB_PROFILE_EDITOR_SAVE',
@@ -10,60 +12,74 @@ const preview = {
   profile: { alias: 'CamilleM', city: 'Sherbrooke', games: ['basketball', 'chess'], isPublic: true,
     wantsToOrganize: true, interestedInVolunteering: false,
     socials: [{ platform: 'instagram', url: 'https://instagram.com/' }, { platform: 'website', url: 'https://example.com' }] },
-  dashboard: { gamesPlayed: 18, gamesWon: 11, totalContributions: { CAD: 135 },
+  dashboard: { gamesWon: 11, totalWinnings: { CAD: 480 }, paymentsReceived: { CAD: 360 }, pendingPayments: { CAD: 120 }, totalContributions: { CAD: 135 },
     causes: [{ name: 'Jeunesse en mouvement', currency: 'CAD', contributed: 75 }, { name: 'Refuge local', currency: 'CAD', contributed: 60 }] },
   games: [{ slug: 'basketball', nameFr: 'Basketball' }, { slug: 'chess', nameFr: 'Échecs' }]
 };
 
+preview.invitations = [{ invitationId: 'demo-invite', competitionId: 'demo-competition', title: 'Soirée échecs pour la jeunesse', startAt: '2027-04-18T23:00:00Z', timezone: 'America/Toronto', locationType: 'online', feeAmount: 20, currency: 'CAD' }];
+preview.schedule = [{ registrationId: 'demo-paid', title: 'Basketball pour notre communauté', startAt: '2027-04-22T22:00:00Z', timezone: 'America/Toronto', locationType: 'physical', locationName: 'Centre communautaire — exemple', address: '123, rue Exemple, Sherbrooke', feeAmount: 25, currency: 'CAD', registrationStatus: 'confirmed' }, { registrationId: 'demo-unpaid', title: 'Tournoi amical en ligne', startAt: '2027-04-25T23:00:00Z', timezone: 'America/Toronto', locationType: 'online', feeAmount: 15, currency: 'CAD', registrationStatus: 'pending_payment' }];
 let data = null;
 let editing = false;
 let embedded = window.parent !== window;
 let loadTimer;
+let publicView = location.hash.startsWith('#/player/') || location.hash.includes('preview-public');
+let publicUrl = '';
+let canContinueToEvent = false;
+let parentOrigin = '*';
+function trustedOrigin(origin) {
+  try { const url = new URL(origin); return url.protocol === 'https:' && ['www.jouerpourdebon.ca', 'jouerpourdebon.ca', 'editor.wix.com', 'yellowpagescanada-website-10110.editor.wix.com'].includes(url.hostname); }
+  catch { return false; }
+}
+let activeRequest = null;
+let activeAction = null;
+let actionTimer;
+
+function dashboardAction(type, payload) {
+  if (activeRequest) return;
+  const status = app.querySelector('#action-status');
+  if (isPreview()) {
+    if (type === 'JPDB_PLAYER_INVITATION_RESPONSE') {
+      const invitation = data.invitations.find(item => item.invitationId === payload.invitationId);
+      if (invitation && payload.response === 'accepted') invitation.invitationStatus = 'accepted';
+      if (payload.response === 'declined') data.invitations = data.invitations.filter(item => item.invitationId !== payload.invitationId);
+      renderDashboard();
+    }
+    app.querySelector('#action-status').textContent = 'Démonstration uniquement : aucune inscription ni aucun paiement effectué.';
+    return;
+  }
+  activeRequest = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  activeAction = type;
+  app.querySelectorAll('.invitation-response,.checkout-button').forEach(button => { button.disabled = true; });
+  status.textContent = 'Traitement en cours…';
+  window.parent.postMessage({ type, requestId: activeRequest, payload }, parentOrigin);
+  actionTimer = setTimeout(() => {
+    activeRequest = null;
+    activeAction = null;
+    status.textContent = 'La réponse prend du temps. Actualisez votre calendrier avant de réessayer.';
+    app.querySelectorAll('.invitation-response,.checkout-button').forEach(button => { button.disabled = false; });
+  }, 30000);
+}
 
 function text(value, max = 200) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
 function money(amount, currency = 'CAD') { return new Intl.NumberFormat('fr-CA', { style: 'currency', currency }).format(Number(amount) || 0); }
 function escapeHtml(value) { return text(String(value), 600).replace(/[&<>'"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' })[c]); }
-function isPreview() { return location.hash.includes('preview-profile'); }
+function isPreview() { return previewMode; }
 function normalized(payload) {
   const profile = payload?.profile && typeof payload.profile === 'object' ? payload.profile : {};
   const dashboard = payload?.dashboard && typeof payload.dashboard === 'object' ? payload.dashboard : {};
   return { ...payload, profile, dashboard, games: Array.isArray(payload?.games) ? payload.games : [] };
 }
-function gamesList() {
-  return (data.profile.games || []).map(game => {
-    const slug = typeof game === 'string' ? game : game?.slug;
-    return data.games.find(item => item.slug === slug)?.nameFr || slug;
-  }).filter(Boolean);
-}
-function socialLinks() {
-  return (data.profile.socials || []).filter(link => /^https:\/\//.test(link?.url || '')).map(link =>
-    `<a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">${escapeHtml(link.platform)}</a>`).join('');
-}
-function dashboard() {
-  const impact = data.dashboard || {};
-  const totals = Object.entries(impact.totalContributions || {}).map(([currency, amount]) => money(amount, currency)).join(' · ') || '0 $';
-  const causes = Array.isArray(impact.causes) ? impact.causes : [];
-  return `<section class="stats" aria-label="Mon impact">
-    <article><span>🏆</span><strong>${Number.isFinite(impact.gamesPlayed) ? impact.gamesPlayed : '—'}</strong><small>Parties jouées</small></article>
-    <article><span>✨</span><strong>${Number.isFinite(impact.gamesWon) ? impact.gamesWon : '—'}</strong><small>Parties gagnées</small></article>
-    <article><span>♥</span><strong>${totals}</strong><small>Contributions aux causes</small></article>
-  </section>
-  <section class="card causes"><h2>Causes soutenues</h2>${causes.length ? `<ul>${causes.map(cause => `<li><span>${escapeHtml(cause.name)}</span><strong>${money(cause.contributed, cause.currency)}</strong></li>`).join('')}</ul>` : '<p>Aucune contribution confirmée pour le moment.</p>'}</section>`;
-}
 function renderDashboard() {
-  const profile = data.profile;
-  const name = text(profile.alias) || text(data.member?.nickname) || text(data.member?.firstName) || 'Votre profil';
-  document.title = `${name} | Jouer pour de bon`;
-  app.innerHTML = `<div class="shell">
-    ${isPreview() ? '<div class="preview-banner">Aperçu public — données fictives</div>' : ''}
-    <header><div class="eyebrow">Espace joueur</div><h1>Mon profil joueur</h1><p>Votre espace pour jouer, participer et faire une différence.</p></header>
-    <section class="identity card"><div class="avatar">${escapeHtml(name.slice(0,2).toUpperCase())}</div><div class="identity-copy"><h2>${escapeHtml(name)}</h2><p>⌖ ${escapeHtml(profile.city || 'Ville non renseignée')}</p><span class="pill">${profile.isPublic ? 'Profil visible dans l’annuaire' : 'Profil privé'}</span>${socialLinks() ? `<div class="socials">${socialLinks()}</div>` : ''}</div><button id="edit" class="primary">Modifier mon profil</button></section>
-    ${dashboard()}
-    <div class="grid"><section class="card"><h2>Mes jeux</h2><div class="chips">${gamesList().map(game => `<span>${escapeHtml(game)}</span>`).join('') || '<p>Ajoutez vos jeux à votre profil.</p>'}</div></section>
-    <section class="card"><h2>Ma participation</h2><p>Organiser des parties : <strong>${profile.wantsToOrganize ? 'Intéressé·e' : 'Non sélectionné'}</strong></p><p>Bénévolat : <strong>${profile.interestedInVolunteering ? 'Intéressé·e' : 'Non sélectionné'}</strong></p></section></div>
-    <p class="note">Les parties, victoires et contributions proviennent des données confirmées. Elles ne sont pas modifiables ici.</p>
-  </div>`;
+  app.innerHTML = dashboardHtml(data, { publicView, preview: isPreview(), publicUrl, canContinueToEvent });
+  if (publicView) return;
   app.querySelector('#edit').addEventListener('click', renderEditor);
+  app.querySelector('#continue-event')?.addEventListener('click', () => dashboardAction('JPDB_PROFILE_CONTINUE_EVENT', {}));
+  app.querySelector('#refresh-dashboard').addEventListener('click', () => { if (!isPreview()) requestData(); });
+  app.querySelectorAll('.invitation-response').forEach(button => button.addEventListener('click', () => {
+    dashboardAction('JPDB_PLAYER_INVITATION_RESPONSE', { invitationId: button.dataset.invitation, response: button.dataset.response });
+  }));
+  app.querySelectorAll('.checkout-button').forEach(button => button.addEventListener('click', () => dashboardAction('JPDB_PLAYER_CHECKOUT', { registrationId: button.dataset.registration })));
 }
 function renderEditor() {
   editing = true;
@@ -80,22 +96,40 @@ function saveProfile(event) {
   const socials = ['website', 'instagram', 'tiktok', 'youtube'].map(platform => ({ platform, url: text(form.get(platform), 500) })).filter(link => /^https:\/\//.test(link.url));
   const payload = { ...data.profile, alias: text(form.get('alias'), 100), city: text(form.get('city'), 150), isPublic: form.get('isPublic') === 'on', socials };
   if (isPreview()) { data.profile = payload; editing = false; renderDashboard(); return; }
-  window.parent.postMessage({ type: MESSAGE.save, payload }, '*');
+  window.parent.postMessage({ type: MESSAGE.save, payload }, parentOrigin);
   app.querySelector('#form-message').textContent = 'Enregistrement…';
 }
 function renderConnectionMessage() {
   app.innerHTML = `<div class="shell center"><div class="card"><div class="eyebrow">Mon profil joueur</div><h1>Connexion requise</h1><p>Ouvrez votre profil depuis votre compte Jouer pour de bon afin de voir vos données personnelles.</p><a class="primary" href="#/preview-profile">Voir l’aperçu du profil</a></div></div>`;
 }
-function requestData() { window.parent.postMessage({ type: MESSAGE.request }, '*'); }
+function requestData() { window.parent.postMessage({ type: MESSAGE.request }, parentOrigin); }
 function startPrivateProfile() {
   if (!embedded) return renderConnectionMessage();
   window.addEventListener('message', event => {
-    if (event.source !== window.parent || !event.data || typeof event.data !== 'object') return;
-    if (event.data.type === MESSAGE.data) { clearTimeout(loadTimer); data = normalized(event.data.payload); renderDashboard(); }
-    if (event.data.type === MESSAGE.saved) { editing = false; requestData(); }
-    if (event.data.type === MESSAGE.error) app.innerHTML = `<div class="shell center"><div class="card"><h1>Impossible de charger le profil</h1><p>${escapeHtml(event.data.message || 'Réessayez plus tard.')}</p></div></div>`;
+    if (event.source !== window.parent || !trustedOrigin(event.origin) || !event.data || typeof event.data !== 'object') return;
+    parentOrigin = event.origin;
+    if (event.data.type === MESSAGE.data) { clearTimeout(loadTimer); publicView = event.data.publicView === true; publicUrl = event.data.publicUrl || ''; data = normalized(event.data.payload); renderDashboard(); }
+    if (event.data.type === 'JPDB_PLAYER_ACTION_RESULT' && event.data.requestId === activeRequest) {
+      clearTimeout(actionTimer);
+      const action = activeAction;
+      activeRequest = null;
+      activeAction = null;
+      const result = event.data.payload || {};
+      const status = app.querySelector('#action-status');
+      if (!status) return;
+      app.querySelectorAll('.invitation-response,.checkout-button').forEach(button => { button.disabled = false; });
+      if (result.success && action === 'JPDB_PLAYER_INVITATION_RESPONSE') {
+        requestData();
+      } else if (result.success && result.checkoutUrl && /^https:\/\//.test(result.checkoutUrl)) {
+        status.textContent = 'Votre paiement sécurisé est prêt. Après le paiement, actualisez votre calendrier. ';
+        const link = document.createElement('a'); link.href = result.checkoutUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Continuer vers le paiement ↗'; status.append(link);
+      } else if (result.success) { requestData(); }
+      else { status.textContent = result.code === 'PAYMENT_NOT_CONFIGURED' ? 'Le paiement en ligne n’est pas encore disponible. Votre inscription reste en attente de paiement.' : 'Impossible de compléter cette demande. Vérifiez votre profil et actualisez les événements avant de réessayer.'; }
+    }
+    if (event.data.type === MESSAGE.saved) { editing = false; canContinueToEvent = event.data.canContinueToEvent === true; requestData(); }
+    if (event.data.type === MESSAGE.error) { clearTimeout(loadTimer); app.innerHTML = `<div class="shell center"><div class="card"><h1>Impossible de charger le profil</h1><p>${escapeHtml(event.data.message || 'Réessayez plus tard.')}</p></div></div>`; }
   });
-  window.parent.postMessage({ type: MESSAGE.ready }, '*'); requestData();
+  window.parent.postMessage({ type: MESSAGE.ready }, parentOrigin); requestData();
   loadTimer = setTimeout(renderConnectionMessage, 9000);
 }
 
