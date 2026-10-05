@@ -26,16 +26,16 @@ function invitationActions(event) {
       const parsed = new URL(url);
       if (parsed.origin === 'https://www.jouerpourdebon.ca' && parsed.pathname === '/competitions' && /^[0-9a-f-]{36}$/i.test(parsed.searchParams.get('jpdbEvent') || '')) registrationUrl = parsed.href;
     }
-    return `<div class="invitation-actions"><p>Invitation acceptée. Votre inscription et votre paiement restent à compléter séparément.</p>${registrationUrl ? `<a class="primary" href="${escape(registrationUrl)}" target="_blank" rel="noopener noreferrer">Continuer vers l’inscription ↗</a>` : '<p class="muted">Le lien d’inscription sera disponible ici.</p>'}</div>`;
+    return `<div class="invitation-actions"><p>Invitation acceptée. Consultez votre calendrier pour vérifier votre place et compléter le paiement si nécessaire.</p>${registrationUrl ? `<a class="primary" href="${escape(registrationUrl)}" target="_blank" rel="noopener noreferrer">Voir mon inscription ↗</a>` : '<p class="muted">Le lien d’inscription sera disponible ici.</p>'}</div>`;
   }
   if (!['created', 'sent'].includes(status)) return '<p class="muted">Cette invitation n’est plus disponible.</p>';
-  return `<div class="invitation-actions"><p>Accepter cette invitation ne vous inscrit pas et ne déclenche aucun paiement.</p><div class="invitation-buttons"><button type="button" class="primary invitation-response" data-invitation="${escape(event.invitationId)}" data-response="accepted">Accepter</button><button type="button" class="link invitation-response" data-invitation="${escape(event.invitationId)}" data-response="declined">Décliner</button></div></div>`;
+  return `<div class="invitation-actions"><p>${Number(event.feeAmount)>0?'Accepter réserve une place pendant 30 minutes au maximum. Le paiement reste à compléter; aucun montant n’est prélevé automatiquement.':'Accepter vous inscrit à cet événement gratuit, selon les places disponibles.'}</p><div class="invitation-buttons"><button type="button" class="primary invitation-response" data-invitation="${escape(event.invitationId)}" data-response="accepted">Accepter</button><button type="button" class="link invitation-response" data-invitation="${escape(event.invitationId)}" data-response="declined">Décliner</button></div></div>`;
 }
 function eventCard(event, invited) {
-  return `<article class="event-card"><div class="event-heading"><h3>${escape(event.title)}</h3><span class="pill">${invited ? event.invitationStatus === 'accepted' ? 'Invitation acceptée' : 'Invitation' : event.registrationStatus === 'confirmed' ? 'Inscription confirmée' : 'Paiement à compléter'}</span></div>
+  return `<article class="event-card"><div class="event-heading"><h3>${escape(event.title)}</h3><span class="pill">${invited ? event.invitationStatus === 'accepted' ? 'Invitation acceptée' : 'Invitation' : event.registrationStatus === 'confirmed' ? 'Inscription confirmée' : event.registrationStatus === 'expired' ? 'Réservation expirée' : 'Paiement à compléter'}</span></div>
     <p class="event-date">${escape(date(event))}</p>${location(event)}
     <div class="event-footer"><strong>${money(event.feeAmount, event.currency)} <small>de participation</small></strong>
-    ${invited ? invitationActions(event) : event.registrationStatus === 'pending_payment' ? `<button class="primary checkout-button" data-registration="${escape(event.registrationId)}">Payer ma participation</button>` : ''}</div></article>`;
+    ${invited ? invitationActions(event) : event.registrationStatus === 'expired' ? '<p>Votre réservation a expiré. Contactez l’organisateur.</p>' : event.registrationStatus === 'pending_payment' ? (safeUrl(event.registrationUrl) ? `<a class="primary" href="${escape(safeUrl(event.registrationUrl))}" target="_blank" rel="noopener noreferrer">Payer ma participation ↗</a>` : `<button class="primary checkout-button" data-registration="${escape(event.registrationId)}">Payer ma participation</button>`) : ''}</div></article>`;
 }
 export function dashboardHtml(data, { publicView = false, preview = false, publicUrl = '', canContinueToEvent = false } = {}) {
   const impact = data.dashboard || {};

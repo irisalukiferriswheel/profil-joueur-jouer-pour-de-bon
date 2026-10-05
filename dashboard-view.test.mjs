@@ -23,22 +23,22 @@ test('pending invitation exposes response buttons but no registration or payment
   const html = dashboardHtml({ ...data, schedule: [], invitations: [invitation] });
   assert.match(html, /data-response="accepted"/);
   assert.match(html, /data-response="declined"/);
-  assert.doesNotMatch(html, /invitation-form|checkout-button|Continuer vers l’inscription|href="https:\/\/www.jouerpourdebon.ca\/competitions/);
+  assert.doesNotMatch(html, /invitation-form|checkout-button|Voir mon inscription|href="https:\/\/www.jouerpourdebon.ca\/competitions/);
 });
 test('accepted invitation exposes only the separate canonical registration link', () => {
   const html = dashboardHtml({ ...data, schedule: [], invitations: [{ ...invitation, invitationStatus: 'accepted' }] });
   assert.match(html, /Invitation acceptée/);
-  assert.match(html, /Continuer vers l’inscription/);
+  assert.match(html, /Voir mon inscription/);
   assert.doesNotMatch(html, /data-response=|checkout-button|invitation-form/);
-  assert.doesNotMatch(dashboardHtml({ ...data, schedule: [], invitations: [{ ...invitation, invitationStatus: 'accepted', canRegister: false }] }), /Continuer vers l’inscription/);
+  assert.doesNotMatch(dashboardHtml({ ...data, schedule: [], invitations: [{ ...invitation, invitationStatus: 'accepted', canRegister: false }] }), /Voir mon inscription/);
   for (const url of ['https://evil.example/competitions?jpdbEvent=11111111-1111-4111-8111-111111111111', 'javascript:alert(1)', 'https://www.jouerpourdebon.ca/competitions?jpdbEvent=not-an-event']) {
-    assert.doesNotMatch(dashboardHtml({ ...data, schedule: [], invitations: [{ ...invitation, invitationStatus: 'accepted', registrationUrl: url }] }), /Continuer vers l’inscription/);
+    assert.doesNotMatch(dashboardHtml({ ...data, schedule: [], invitations: [{ ...invitation, invitationStatus: 'accepted', registrationUrl: url }] }), /Voir mon inscription/);
   }
 });
 test('declined and revoked invitations cannot be accepted or registered from the card', () => {
   for (const invitationStatus of ['declined', 'revoked']) {
     const html = dashboardHtml({ ...data, schedule: [], invitations: [{ ...invitation, invitationStatus }] });
-    assert.doesNotMatch(html, /data-response=|checkout-button|Continuer vers l’inscription/);
+    assert.doesNotMatch(html, /data-response=|checkout-button|Voir mon inscription/);
   }
 });
 test('clicking accept sends only a response; acknowledgement only refreshes the dashboard', () => {
