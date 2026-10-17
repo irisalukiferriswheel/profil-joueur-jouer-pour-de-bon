@@ -69,6 +69,7 @@ export function connectEmbed({ window, origins, onLanguage }) {
   let session = null;
   let revision = -1;
   let pendingChoice = null;
+  let choiceSequence = 0;
   const embedded = window.parent !== window;
   const send = data => {
     if (!embedded) return;
@@ -77,17 +78,19 @@ export function connectEmbed({ window, origins, onLanguage }) {
   const receive = event => {
     if (!embedded || event.source !== window.parent || !origins.includes(event.origin)) return;
     const data = event.data;
+    if (isPacket(data, 'request-ready')) { send({ ...packet('ready'), clientId }); return; }
     if (!isPacket(data, 'set') || !language(data.language) || data.clientId !== clientId) return;
     if (typeof data.session !== 'string' || !data.session || !Number.isSafeInteger(data.revision) || data.revision < 0) return;
     if ((session && data.session !== session) || data.revision <= revision) return;
     session = data.session;
     revision = data.revision;
     hostOrigin = event.origin;
-    onLanguage(language(data.language), { siteLanguage: language(data.siteLanguage), explicit: data.explicit === true });
+    // Do not overwrite a newer local choice with an intermediate host acknowledgement.
+    if (!choiceSequence || data.ackSequence >= choiceSequence) onLanguage(language(data.language), { siteLanguage: language(data.siteLanguage), explicit: data.explicit === true });
     if (pendingChoice) {
       const code = pendingChoice;
       pendingChoice = null;
-      send({ ...packet('choose', code), clientId, session, revision });
+      send({ ...packet('choose', code), clientId, session, revision, choiceSequence });
     }
   };
   window.addEventListener('message', receive);
@@ -104,8 +107,9 @@ export function connectEmbed({ window, origins, onLanguage }) {
     choose(value) {
       const code = language(value);
       if (!code) return;
+      choiceSequence += 1;
       if (!session) { pendingChoice = code; return; }
-      send({ ...packet('choose', code), clientId, session, revision });
+      send({ ...packet('choose', code), clientId, session, revision, choiceSequence });
     },
     reload(value) { if (session && language(value)) send({ ...packet('reload', value), clientId, session, revision, confirmed: true }); },
     destroy() { window.clearInterval(timer); window.removeEventListener('message', receive); window.removeEventListener('load', ready); }
