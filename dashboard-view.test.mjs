@@ -50,7 +50,7 @@ test('clicking accept sends only a response; acknowledgement only refreshes the 
   let receive;
   const parent = { postMessage: message => sent.push(message) };
   const window = { parent, addEventListener: (type, fn) => { receive = fn; } };
-  vm.runInNewContext(readFileSync(new URL('./app.js', import.meta.url), 'utf8').replace(/^import .*?;\r?\n/, ''), { document: { querySelector: () => app }, window, location: { hash: '#/my-profile' }, URL, dashboardHtml, setTimeout: () => 1, clearTimeout() {} });
+  vm.runInNewContext(readFileSync(new URL('./app.js', import.meta.url), 'utf8').replace(/^import .*?;\r?\n/gm, ''), { document: { querySelector: () => app }, window, location: { hash: '#/my-profile' }, URL, dashboardHtml, t:value=>value, locale:()=>'fr-CA', setLocale(){}, setTimeout: () => 1, clearTimeout() {} });
   receive({ source: parent, origin: 'https://www.jouerpourdebon.ca', data: { type: 'JPDB_PROFILE_EDITOR_DATA', payload: { ...data, invitations: [invitation], schedule: [] } } });
   sent.length = 0;
   buttons[0].click();

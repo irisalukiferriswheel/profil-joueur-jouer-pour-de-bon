@@ -1,3 +1,5 @@
+import {createLanguageController} from './jpdbLocalization.js';
+import {t,locale,setLocale} from './i18n.js';
 import { dashboardHtml } from './dashboard-view.js';
 const app = document.querySelector('#app');
 const previewMode = location.hash.includes('preview-profile') || location.hash.includes('preview-public');
@@ -45,24 +47,24 @@ function dashboardAction(type, payload) {
       if (payload.response === 'declined') data.invitations = data.invitations.filter(item => item.invitationId !== payload.invitationId);
       renderDashboard();
     }
-    app.querySelector('#action-status').textContent = 'Démonstration uniquement : aucune inscription ni aucun paiement effectué.';
+    app.querySelector('#action-status').textContent = t("Démonstration uniquement : aucune inscription ni aucun paiement effectué.");
     return;
   }
   activeRequest = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   activeAction = type;
   app.querySelectorAll('.invitation-response,.checkout-button').forEach(button => { button.disabled = true; });
-  status.textContent = 'Traitement en cours…';
+  status.textContent = t("Traitement en cours…");
   window.parent.postMessage({ type, requestId: activeRequest, payload }, parentOrigin);
   actionTimer = setTimeout(() => {
     activeRequest = null;
     activeAction = null;
-    status.textContent = 'La réponse prend du temps. Actualisez votre calendrier avant de réessayer.';
+    status.textContent = t("La réponse prend du temps. Actualisez votre calendrier avant de réessayer.");
     app.querySelectorAll('.invitation-response,.checkout-button').forEach(button => { button.disabled = false; });
   }, 30000);
 }
 
 function text(value, max = 200) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
-function money(amount, currency = 'CAD') { return new Intl.NumberFormat('fr-CA', { style: 'currency', currency }).format(Number(amount) || 0); }
+function money(amount, currency = 'CAD') { return new Intl.NumberFormat(locale(), { style: 'currency', currency }).format(Number(amount) || 0); }
 function escapeHtml(value) { return text(String(value), 600).replace(/[&<>'"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' })[c]); }
 function isPreview() { return previewMode; }
 function normalized(payload) {
@@ -85,8 +87,8 @@ function renderEditor() {
   editing = true;
   const p = data.profile;
   const socials = Object.fromEntries((p.socials || []).map(link => [link.platform, link.url]));
-  app.innerHTML = `<div class="shell"><button id="back" class="link">← Retour au profil</button><header><div class="eyebrow">Espace joueur</div><h1>Modifier mon profil</h1><p>Vos coordonnées restent privées. Les liens sociaux sont facultatifs et publics.</p></header>
-  <form id="profile-form" class="card form"><label>Alias public<input name="alias" value="${escapeHtml(p.alias || '')}" required></label><label>Ville<input name="city" value="${escapeHtml(p.city || '')}"></label><label>Site Web<input name="website" type="url" placeholder="https://…" value="${escapeHtml(socials.website || '')}"></label><label>Instagram<input name="instagram" type="url" placeholder="https://…" value="${escapeHtml(socials.instagram || '')}"></label><label>TikTok<input name="tiktok" type="url" placeholder="https://…" value="${escapeHtml(socials.tiktok || '')}"></label><label>YouTube<input name="youtube" type="url" placeholder="https://…" value="${escapeHtml(socials.youtube || '')}"></label><label class="toggle"><input name="isPublic" type="checkbox" ${p.isPublic ? 'checked' : ''}> Afficher mon profil dans l’annuaire public</label><p id="form-message" class="message"></p><button class="primary" type="submit">Enregistrer mon profil</button></form></div>`;
+  app.innerHTML = `<div class="shell"><button id="back" class="link">${t("← Retour au profil")}</button><header><div class="eyebrow">${t("Espace joueur")}</div><h1>${t("Modifier mon profil")}</h1><p>${t("Vos coordonnées restent privées. Les liens sociaux sont facultatifs et publics.")}</p></header>
+  <form id="profile-form" class="card form"><label>${t("Alias public")}<input name="alias" value="${escapeHtml(p.alias || '')}" required></label><label>${t("Ville")}<input name="city" value="${escapeHtml(p.city || '')}"></label><label>${t("Site Web")}<input name="website" type="url" placeholder="https://…" value="${escapeHtml(socials.website || '')}"></label><label>Instagram<input name="instagram" type="url" placeholder="https://…" value="${escapeHtml(socials.instagram || '')}"></label><label>TikTok<input name="tiktok" type="url" placeholder="https://…" value="${escapeHtml(socials.tiktok || '')}"></label><label>YouTube<input name="youtube" type="url" placeholder="https://…" value="${escapeHtml(socials.youtube || '')}"></label><label class="toggle"><input name="isPublic" type="checkbox" ${p.isPublic ? 'checked' : ''}> ${t("Afficher mon profil dans l’annuaire public")}</label><p id="form-message" class="message"></p><button class="primary" type="submit">${t("Enregistrer mon profil")}</button></form></div>`;
   app.querySelector('#back').addEventListener('click', () => { editing = false; renderDashboard(); });
   app.querySelector('#profile-form').addEventListener('submit', saveProfile);
 }
@@ -97,10 +99,10 @@ function saveProfile(event) {
   const payload = { ...data.profile, alias: text(form.get('alias'), 100), city: text(form.get('city'), 150), isPublic: form.get('isPublic') === 'on', socials };
   if (isPreview()) { data.profile = payload; editing = false; renderDashboard(); return; }
   window.parent.postMessage({ type: MESSAGE.save, payload }, parentOrigin);
-  app.querySelector('#form-message').textContent = 'Enregistrement…';
+  app.querySelector('#form-message').textContent = t("Enregistrement…");
 }
 function renderConnectionMessage() {
-  app.innerHTML = `<div class="shell center"><div class="card"><div class="eyebrow">Mon profil joueur</div><h1>Connexion requise</h1><p>Ouvrez votre profil depuis votre compte Jouer pour de bon afin de voir vos données personnelles.</p><a class="primary" href="#/preview-profile">Voir l’aperçu du profil</a></div></div>`;
+  app.innerHTML = `<div class="shell center"><div class="card"><div class="eyebrow">${t("Mon profil joueur")}</div><h1>${t("Connexion requise")}</h1><p>${t("Ouvrez votre profil depuis votre compte Jouer pour de bon afin de voir vos données personnelles.")}</p><a class="primary" href="#/preview-profile">${t("Voir l’aperçu du profil")}</a></div></div>`;
 }
 function requestData() { window.parent.postMessage({ type: MESSAGE.request }, parentOrigin); }
 function startPrivateProfile() {
@@ -122,12 +124,12 @@ function startPrivateProfile() {
         requestData();
       } else if (result.success && result.checkoutUrl && /^https:\/\//.test(result.checkoutUrl)) {
         status.textContent = 'Votre paiement sécurisé est prêt. Après le paiement, actualisez votre calendrier. ';
-        const link = document.createElement('a'); link.href = result.checkoutUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Continuer vers le paiement ↗'; status.append(link);
+        const link = document.createElement('a'); link.href = result.checkoutUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = t("Continuer vers le paiement ↗"); status.append(link);
       } else if (result.success) { requestData(); }
-      else { const messages={COMPETITION_FULL:'Cet événement est complet. Votre invitation n’a pas été acceptée.',PLAYER_PROFILE_REQUIRED:'Complétez votre profil joueur avant d’accepter cette invitation.',AGE_NOT_ELIGIBLE:'Vous ne remplissez pas les conditions d’âge de cet événement.',REGISTRATION_CLOSED:'Les inscriptions sont fermées.',INVITATION_ALREADY_ANSWERED:'Cette invitation a déjà reçu une réponse. Actualisez votre profil.',PAYMENT_NOT_CONFIGURED:'Le paiement en ligne n’est pas encore disponible. Votre inscription reste en attente de paiement.'};status.textContent=messages[result.code]||'Impossible de compléter cette demande. Vérifiez votre profil et actualisez les événements avant de réessayer.'; }
+      else { const messages={COMPETITION_FULL:t("Cet événement est complet. Votre invitation n’a pas été acceptée."),PLAYER_PROFILE_REQUIRED:t("Complétez votre profil joueur avant d’accepter cette invitation."),AGE_NOT_ELIGIBLE:t("Vous ne remplissez pas les conditions d’âge de cet événement."),REGISTRATION_CLOSED:t("Les inscriptions sont fermées."),INVITATION_ALREADY_ANSWERED:t("Cette invitation a déjà reçu une réponse. Actualisez votre profil."),PAYMENT_NOT_CONFIGURED:t("Le paiement en ligne n’est pas encore disponible. Votre inscription reste en attente de paiement.")};status.textContent=messages[result.code]||t("Impossible de compléter cette demande. Vérifiez votre profil et actualisez les événements avant de réessayer."); }
     }
     if (event.data.type === MESSAGE.saved) { editing = false; canContinueToEvent = event.data.canContinueToEvent === true; requestData(); }
-    if (event.data.type === MESSAGE.error) { clearTimeout(loadTimer); app.innerHTML = `<div class="shell center"><div class="card"><h1>Impossible de charger le profil</h1><p>${escapeHtml(event.data.message || 'Réessayez plus tard.')}</p></div></div>`; }
+    if (event.data.type === MESSAGE.error) { clearTimeout(loadTimer); app.innerHTML = `<div class="shell center"><div class="card"><h1>${t("Impossible de charger le profil")}</h1><p>${escapeHtml(t("Réessayez plus tard."))}</p></div></div>`; }
   });
   window.parent.postMessage({ type: MESSAGE.ready }, parentOrigin); requestData();
   loadTimer = setTimeout(renderConnectionMessage, 9000);
@@ -135,3 +137,21 @@ function startPrivateProfile() {
 
 if (isPreview()) { data = normalized(preview); renderDashboard(); } else startPrivateProfile();
 
+
+if(typeof document.createElement==='function'){
+const languageBar=document.createElement('div');languageBar.setAttribute('role','group');languageBar.setAttribute('data-jpdb-language-control','');languageBar.style.cssText='display:flex;gap:8px;padding:12px';app.before(languageBar);
+const languageController=createLanguageController(window,code=>{
+ setLocale(code);document.title=code==='fr'?'Profil joueur | Jouer pour de bon':'Player profile | Playing for Good';
+ const form=app.querySelector('#profile-form');
+ const fields=form?[...form.elements].map(el=>({name:el.name,value:el.value,checked:el.checked})):[];
+ const focus=document.activeElement?.name;
+ const messages=['form-message','action-status'].map(id=>({id,nodes:[...(app.querySelector('#'+id)?.childNodes||[])].map(n=>n.cloneNode(true))}));
+ if(data){if(editing)renderEditor();else renderDashboard();}else if(!embedded)renderConnectionMessage();
+ for(const saved of messages){const target=app.querySelector('#'+saved.id);if(target){for(const node of saved.nodes){if(node.nodeType===3)node.textContent=t(node.textContent);else node.querySelectorAll?.('a').forEach(a=>a.textContent=t(a.textContent));}target.replaceChildren(...saved.nodes);}}
+ if(editing){const next=app.querySelector('#profile-form');for(const field of fields){const el=next?.elements.namedItem(field.name);if(el){el.value=field.value;el.checked=field.checked;}}if(focus)next?.elements.namedItem(focus)?.focus();}
+ if(activeRequest)app.querySelectorAll('.invitation-response,.checkout-button').forEach(button=>{button.disabled=true;});
+ languageBar.setAttribute('aria-label',code==='fr'?'Langue':'Language');languageBar.innerHTML=['fr','en'].map(lang=>'<button type="button" lang="'+lang+'" aria-pressed="'+(lang===code)+'" data-language="'+lang+'">'+(lang==='fr'?'Français':'English')+'</button>').join('');
+});
+languageBar.addEventListener('click',event=>{const code=event.target.dataset.language;if(code)languageController.choose(code);});
+
+}
