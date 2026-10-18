@@ -28,7 +28,8 @@ function makeBracket(){
  while(slots.length>1){box.append(n('h4',t('round')+' '+round));const next=[],list=n('ul');for(let i=0;i<slots.length;i+=2){list.append(n('li',(slots[i]||t('bye'))+' — '+(slots[i+1]||t('bye'))));next.push(!slots[i]?slots[i+1]:!slots[i+1]?slots[i]:t('winner')+' '+round+'.'+(i/2+1));}box.append(list);slots=next;round++;}return box;
 }
 function render(){
- root.replaceChildren();const heading=n('div',null,'section-title');heading.append(n('span','7','step'));const title=n('div');title.append(n('h2',t('title')),n('p',t('hint')));heading.append(title);root.append(heading);if(pageView!=='organizer')title.querySelector('h2').textContent=t(pageView);
+ const focusId=root.contains(document.activeElement)?document.activeElement.id:null;
+ root.lang=context.language;root.replaceChildren();const heading=n('div',null,'section-title');heading.append(n('span','7','step'));const title=n('div');title.append(n('h2',t('title')),n('p',t('hint')));heading.append(title);root.append(heading);if(pageView!=='organizer')title.querySelector('h2').textContent=t(pageView);
  if(context.mode!=='demo'){root.append(button('enableJourney','switch',()=>{const source=document.getElementById('source');source.value='demo';source.dispatchEvent(new Event('change'));}));return;}
  const nav=n('nav',null,'actions');for(const [key,file]of [['organizer','https://irisalukiferriswheel.github.io/espace-organisateur-jouer-pour-de-bon/preview.html'],['profile','https://irisalukiferriswheel.github.io/profil-joueur-jouer-pour-de-bon/journey-preview.html'],['calendar','https://irisalukiferriswheel.github.io/espace-organisateur-jouer-pour-de-bon/calendar-preview.html']]){const a=n('a',t(key),'button');a.id='journey-'+key;a.href=file+'?lang='+context.language;a.target='_top';if(key===view)a.setAttribute('aria-current','page');nav.append(a);}root.append(nav);
  if(pageView!=='organizer'){const languages=n('div',null,'actions');for(const code of ['fr','en']){const b=n('button',code.toUpperCase());b.id='journeyLang-'+code;b.onclick=()=>{context.language=code;document.documentElement.lang=code;render();};languages.append(b);}root.append(languages);}
@@ -49,7 +50,8 @@ function render(){
   panel.append(button('openTestEvent','detail',()=>{details=true;render();}));
   if(details){const detail=n('div');detail.id='journeyDetails';detail.append(n('p',t('free')));if(event.registered.size>=event.capacity)detail.append(n('p',t('full')));if(event.registered.has(person))detail.append(n('p',t('registered')));detail.append(button('joinTest','join',()=>register(false)));panel.append(detail);}
  }
- const status=n('p',message?t(message):'');status.id='journeyStatus';status.setAttribute('role','status');root.append(status,button('resetJourney','reset',()=>{event=null;bracketOpen=false;view=pageView;person=0;details=false;message='';persist();render();}));
+ const status=n('p',message?t(message):'');status.id='journeyStatus';status.setAttribute('role','status');status.tabIndex=-1;root.append(status,button('resetJourney','reset',()=>{event=null;bracketOpen=false;view=pageView;person=0;details=false;message='';persist();render();}));
+ if(focusId)(document.getElementById(focusId)||status).focus({preventScroll:true});
 }
 render();
 }

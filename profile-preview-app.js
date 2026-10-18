@@ -1,4 +1,4 @@
-import { mountProfileJourney } from './journey-adapter.js';
+import { mountProfileJourney } from './journey-adapter.js?v=a11y1';
 const app = document.querySelector('#app');
 const MESSAGE = {
   ready: 'JPDB_PROFILE_EDITOR_READY', request: 'JPDB_PROFILE_EDITOR_REQUEST_DATA',
@@ -55,7 +55,7 @@ function renderDashboard() {
   const profile = data.profile;
   const name = text(profile.alias) || text(data.member?.nickname) || text(data.member?.firstName) || 'Votre profil';
   document.title = `${name} | Jouer pour de bon`;
-  app.innerHTML = `<div class="shell">
+  app.innerHTML = `<div class="shell" lang="fr">
     ${isPreview() ? '<div class="preview-banner">Aperçu public — données fictives</div>' : ''}
     <header><div class="eyebrow">Espace joueur</div><h1>Mon profil joueur</h1><p>Votre espace pour jouer, participer et faire une différence.</p></header>
     <section class="identity card"><div class="avatar">${escapeHtml(name.slice(0,2).toUpperCase())}</div><div class="identity-copy"><h2>${escapeHtml(name)}</h2><p>⌖ ${escapeHtml(profile.city || 'Ville non renseignée')}</p><span class="pill">${profile.isPublic ? 'Profil visible dans l’annuaire' : 'Profil privé'}</span>${socialLinks() ? `<div class="socials">${socialLinks()}</div>` : ''}</div><button id="edit" class="primary">Modifier mon profil</button></section>
@@ -72,7 +72,7 @@ function renderEditor() {
   editing = true;
   const p = data.profile;
   const socials = Object.fromEntries((p.socials || []).map(link => [link.platform, link.url]));
-  app.innerHTML = `<div class="shell"><button id="back" class="link">← Retour au profil</button><header><div class="eyebrow">Espace joueur</div><h1>Modifier mon profil</h1><p>Vos coordonnées restent privées. Les liens sociaux sont facultatifs et publics.</p></header>
+  app.innerHTML = `<div class="shell" lang="fr"><button id="back" class="link">← Retour au profil</button><header><div class="eyebrow">Espace joueur</div><h1>Modifier mon profil</h1><p>Vos coordonnées restent privées. Les liens sociaux sont facultatifs et publics.</p></header>
   <form id="profile-form" class="card form"><label>Alias public<input name="alias" value="${escapeHtml(p.alias || '')}" required></label><label>Ville<input name="city" value="${escapeHtml(p.city || '')}"></label><label>Site Web<input name="website" type="url" placeholder="https://…" value="${escapeHtml(socials.website || '')}"></label><label>Instagram<input name="instagram" type="url" placeholder="https://…" value="${escapeHtml(socials.instagram || '')}"></label><label>TikTok<input name="tiktok" type="url" placeholder="https://…" value="${escapeHtml(socials.tiktok || '')}"></label><label>YouTube<input name="youtube" type="url" placeholder="https://…" value="${escapeHtml(socials.youtube || '')}"></label><label class="toggle"><input name="isPublic" type="checkbox" ${p.isPublic ? 'checked' : ''}> Afficher mon profil dans l’annuaire public</label><p id="form-message" class="message"></p><button class="primary" type="submit">Enregistrer mon profil</button></form></div>`;
   app.querySelector('#back').addEventListener('click', () => { editing = false; renderDashboard(); });
   app.querySelector('#profile-form').addEventListener('submit', saveProfile);
