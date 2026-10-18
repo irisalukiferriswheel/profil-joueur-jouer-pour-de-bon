@@ -70,7 +70,7 @@ function renderEditor() {
   const p = data.profile;
   const socials = Object.fromEntries((p.socials || []).map(link => [link.platform, link.url]));
   app.innerHTML = `<div class="shell"><button id="back" class="link">← Retour au profil</button><header><div class="eyebrow">Espace joueur</div><h1>Modifier mon profil</h1><p>Vos coordonnées restent privées. Les liens sociaux sont facultatifs et publics.</p></header>
-  <form id="profile-form" class="card form"><label>Alias public<input name="alias" value="${escapeHtml(p.alias || '')}" required></label><label>Ville<input name="city" value="${escapeHtml(p.city || '')}"></label><label>Site Web<input name="website" type="url" placeholder="https://…" value="${escapeHtml(socials.website || '')}"></label><label>Instagram<input name="instagram" type="url" placeholder="https://…" value="${escapeHtml(socials.instagram || '')}"></label><label>TikTok<input name="tiktok" type="url" placeholder="https://…" value="${escapeHtml(socials.tiktok || '')}"></label><label>YouTube<input name="youtube" type="url" placeholder="https://…" value="${escapeHtml(socials.youtube || '')}"></label><label class="toggle"><input name="isPublic" type="checkbox" ${p.isPublic ? 'checked' : ''}> Afficher mon profil dans l’annuaire public</label><p id="form-message" class="message"></p><button class="primary" type="submit">Enregistrer mon profil</button></form></div>`;
+  <form id="profile-form" class="card form"><label>Alias public<input name="alias" value="${escapeHtml(p.alias || '')}" required></label><label>Ville<input name="city" value="${escapeHtml(p.city || '')}"></label>${gameFields(p)}<label>Site Web<input name="website" type="url" placeholder="https://…" value="${escapeHtml(socials.website || '')}"></label><label>Instagram<input name="instagram" type="url" placeholder="https://…" value="${escapeHtml(socials.instagram || '')}"></label><label>TikTok<input name="tiktok" type="url" placeholder="https://…" value="${escapeHtml(socials.tiktok || '')}"></label><label>YouTube<input name="youtube" type="url" placeholder="https://…" value="${escapeHtml(socials.youtube || '')}"></label><label class="toggle"><input name="isPublic" type="checkbox" ${p.isPublic ? 'checked' : ''}> Afficher mon profil dans l’annuaire public</label><p id="form-message" class="message"></p><button class="primary" type="submit">Enregistrer mon profil</button></form></div>`;
   app.querySelector('#back').addEventListener('click', () => { editing = false; renderDashboard(); });
   app.querySelector('#profile-form').addEventListener('submit', saveProfile);
 }
@@ -78,7 +78,8 @@ function saveProfile(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const socials = ['website', 'instagram', 'tiktok', 'youtube'].map(platform => ({ platform, url: text(form.get(platform), 500) })).filter(link => /^https:\/\//.test(link.url));
-  const payload = { ...data.profile, alias: text(form.get('alias'), 100), city: text(form.get('city'), 150), isPublic: form.get('isPublic') === 'on', socials };
+  const payload = { ...data.profile, alias: text(form.get('alias'), 100), city: text(form.get('city'), 150), isPublic: form.get('isPublic') === 'on', games: form.getAll('games'), socials };
+  if (!payload.games.length) { app.querySelector('#form-message').textContent = 'Choisissez au moins un jeu.'; return; }
   if (isPreview()) { data.profile = payload; editing = false; renderDashboard(); return; }
   window.parent.postMessage({ type: MESSAGE.save, payload }, '*');
   app.querySelector('#form-message').textContent = 'Enregistrement…';
@@ -101,3 +102,8 @@ function startPrivateProfile() {
 
 if (isPreview()) { data = normalized(preview); renderDashboard(); } else startPrivateProfile();
 
+
+function gameFields(profile) {
+  const selected = new Set((profile.games || []).map(game => typeof game === 'string' ? game : game?.slug));
+  return '<fieldset class="game-fields"><legend>Jeux qui m’intéressent</legend>'+data.games.map(game => '<label class="toggle"><input type="checkbox" name="games" value="'+escapeHtml(game.slug)+'" '+(selected.has(game.slug) ? 'checked' : '')+'> '+escapeHtml(game.nameFr || game.nameEn || game.slug)+'</label>').join('')+'</fieldset>';
+}
