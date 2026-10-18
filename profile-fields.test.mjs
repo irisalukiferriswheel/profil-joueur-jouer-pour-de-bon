@@ -36,10 +36,26 @@ test('interrupted signup resumes editing and existing completed members can edit
   const h=harness({profile:input}); assert.equal((await h.flow.resume()).state,'complete');
   assert.equal((await h.flow.save({...input,alias:'Bob'})).form.profile.alias,'Bob');
 });
-test('expired session cannot save; loaded draft remains available for retry',async()=>{
+test('expired session clears the prior account form before another login',async()=>{
   const h=harness(); await h.flow.resume();h.expire();
-  const result=await h.flow.save(input); assert.equal(result.state,'signed-out');assert.ok(result.form);
+  const result=await h.flow.save(input); assert.equal(result.state,'signed-out');assert.equal(result.form,null);
   assert.equal((await harness({loggedIn:false}).flow.resume()).state,'signed-out');
+});
+test('logout invalidates delayed reads and cannot overwrite the next account',async()=>{
+  let resolveFirst, loads=0;
+  const first=new Promise(resolve=>resolveFirst=resolve);
+  const flow=createSignupFlow({load:async()=>++loads===1?first:{profile:{alias:'Second'},basicsComplete:true,games,cities}});
+  const pending=flow.resume();assert.equal(flow.logout().form,null);
+  assert.equal((await flow.resume()).form.profile.alias,'Second');
+  resolveFirst({profile:{alias:'First'},basicsComplete:true,games,cities});
+  assert.equal((await pending).state,'discarded');
+  assert.equal((await flow.resume()).form.profile.alias,'Second');
+});
+test('logout during a save discards its result and a failed new load exposes no old profile',async()=>{
+  let finish,reads=0;const savePending=new Promise(resolve=>finish=resolve);
+  const flow=createSignupFlow({load:async()=>{reads++;if(reads>1)throw new Error('unavailable');return {profile:input,basicsComplete:true,games,cities};},save:async()=>savePending});
+  await flow.resume();const pending=flow.save(input);flow.logout();finish();assert.equal((await pending).state,'discarded');
+  const result=await flow.resume();assert.equal(result.form,null);assert.equal(result.state,'error');
 });
 test('duplicate submit is single flight and a failed save is retryable',async()=>{
   let finish; const h=harness({wait:new Promise(r=>finish=r)});await h.flow.resume();

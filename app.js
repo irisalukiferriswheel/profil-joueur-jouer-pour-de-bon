@@ -25,6 +25,7 @@ let editing = false;
 let savingProfile = false;
 let saveRequestId = null;
 let profileSaveTimer;
+let sessionEnded = false;
 let embedded = window.parent !== window;
 let loadTimer;
 let publicView = location.hash.startsWith('#/player/') || location.hash.includes('preview-public');
@@ -118,6 +119,14 @@ function startPrivateProfile() {
   window.addEventListener('message', event => {
     if (event.source !== window.parent || !trustedOrigin(event.origin) || !event.data || typeof event.data !== 'object') return;
     parentOrigin = event.origin;
+    if (event.data.type === 'JPDB_PROFILE_SESSION_ENDED' || (event.data.type === MESSAGE.error && ['LOGIN_REQUIRED', 'SESSION_EXPIRED', 'SESSION_UNCONFIRMED'].includes(event.data.code))) {
+      sessionEnded = true; clearTimeout(loadTimer); clearTimeout(profileSaveTimer); clearTimeout(actionTimer);
+      data = null; editing = false; savingProfile = false; saveRequestId = null; activeRequest = null; activeAction = null; publicUrl = ''; canContinueToEvent = false;
+      renderConnectionMessage(); return;
+    }
+    // A new authenticated page load is required; late replies from the old
+    // session must never restore a prior player's private data.
+    if (sessionEnded) return;
     if (event.data.type === MESSAGE.data) { if (editing) return; clearTimeout(loadTimer); publicView = event.data.publicView === true; publicUrl = event.data.publicUrl || ''; data = normalized(event.data.payload); renderDashboard(); }
     if (event.data.type === 'JPDB_PLAYER_ACTION_RESULT' && event.data.requestId === activeRequest) {
       clearTimeout(actionTimer);

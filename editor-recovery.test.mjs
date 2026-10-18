@@ -30,3 +30,13 @@ test('foreign/stale results and background reload cannot discard an active draft
   h.send({type:'JPDB_PROFILE_EDITOR_ERROR',requestId:'old-request'});
   assert.equal(h.app.innerHTML,html);assert.equal(h.element('[type=submit]').disabled,true);
 });
+test('unconfirmed/expired session removes private draft and discards delayed old-session replies',()=>{
+  for(const code of ['LOGIN_REQUIRED','SESSION_EXPIRED','SESSION_UNCONFIRMED']) {
+    const h=harness();h.submit();h.send({type:'JPDB_PROFILE_EDITOR_ERROR',code});
+    assert.doesNotMatch(h.app.innerHTML,/Alice|Sherbrooke|profile-form/);
+    const cleared=h.app.innerHTML;
+    h.send({type:'JPDB_PROFILE_EDITOR_DATA',payload:{profile:{alias:'Old account'}}});
+    h.send({type:'JPDB_PROFILE_EDITOR_SAVED',requestId:'request-1'});
+    assert.equal(h.app.innerHTML,cleared);
+  }
+});
