@@ -1,5 +1,5 @@
 // Additive owned-profile section. Existing profile editor and impact cards stay intact.
-const pending=new Map();let sequence=0,busy=false,language='fr',generation=0;
+const pending=new Map();let sequence=0,busy=false,language='fr',generation=0,sessionEnded=false;
 const box=document.createElement('section');box.className='shell';box.hidden=true;
 document.body.append(box);
 const t=(fr,en)=>language==='en'?en:fr;
@@ -66,6 +66,11 @@ function render(data){
 window.addEventListener('message',event=>{
  if(event.source!==window.parent||!event.data)return;
  const m=event.data;
+ if(m.type==='JPDB_PROFILE_SESSION_ENDED'||(m.type==='JPDB_PROFILE_EDITOR_ERROR'&&['LOGIN_REQUIRED','SESSION_EXPIRED','SESSION_CHANGED','SESSION_UNCONFIRMED'].includes(m.code))){
+  sessionEnded=true;generation++;busy=false;box.hidden=true;box.replaceChildren();
+  for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('SESSION_ENDED'));}pending.clear();return;
+ }
+ if(sessionEnded)return;
  if(m.type==='JPDB_NOTIFICATION_RESULT'){
   const p=pending.get(m.requestId);if(!p)return;clearTimeout(p.timer);pending.delete(m.requestId);p.resolve(m.result);
  }

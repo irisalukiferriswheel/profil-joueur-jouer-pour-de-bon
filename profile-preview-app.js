@@ -1,3 +1,4 @@
+import { createProfileEditTransport } from './profile-edit-transport.js';
 import { mountProfileJourney } from './journey-adapter.js?v=a11y1';
 const app = document.querySelector('#app');
 const MESSAGE = {
@@ -20,6 +21,19 @@ let data = null;
 let editing = false;
 let embedded = window.parent !== window;
 let loadTimer;
+let savingProfile = false;
+const transport = createProfileEditTransport({
+ send: message => window.parent.postMessage(message, '*'),
+ onData: message => { clearTimeout(loadTimer); data = normalized(message.payload); renderDashboard(); },
+ onSaved: () => { savingProfile = false; editing = false; requestData(); },
+ onError: code => {
+  savingProfile = false;
+  const status = app.querySelector('#form-message');
+  if (status) { status.textContent = code === 'PLAYER_PROFILE_INCOMPLETE' ? 'Complétez les renseignements d’admissibilité dans le formulaire existant. Vos choix sont conservés.' : 'Enregistrement non confirmé. Vos choix sont conservés. Réessayez / Save unconfirmed. Your choices are preserved. Retry.'; status.focus(); }
+  const submit = app.querySelector('[type=submit]'); if (submit) submit.disabled = false;
+ },
+ onSessionEnded: () => { clearTimeout(loadTimer); data = null; editing = false; savingProfile = false; renderConnectionMessage(); }
+});
 
 function text(value, max = 200) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
 function money(amount, currency = 'CAD') { return new Intl.NumberFormat('fr-CA', { style: 'currency', currency }).format(Number(amount) || 0); }
@@ -69,22 +83,24 @@ function renderDashboard() {
   if(app.querySelector('#testJourney'))mountProfileJourney();
 }
 function renderEditor() {
-  editing = true;
+  editing = true; transport.editing(true);
   const p = data.profile;
   const socials = Object.fromEntries((p.socials || []).map(link => [link.platform, link.url]));
   app.innerHTML = `<div class="shell" lang="fr"><button id="back" class="link">← Retour au profil</button><header><div class="eyebrow">Espace joueur</div><h1>Modifier mon profil</h1><p>Vos coordonnées restent privées. Les liens sociaux sont facultatifs et publics.</p></header>
-  <form id="profile-form" class="card form"><label>Alias public<input name="alias" value="${escapeHtml(p.alias || '')}" required></label><label>Ville<input name="city" value="${escapeHtml(p.city || '')}"></label>${gameFields(p)}<label>Site Web<input name="website" type="url" placeholder="https://…" value="${escapeHtml(socials.website || '')}"></label><label>Instagram<input name="instagram" type="url" placeholder="https://…" value="${escapeHtml(socials.instagram || '')}"></label><label>TikTok<input name="tiktok" type="url" placeholder="https://…" value="${escapeHtml(socials.tiktok || '')}"></label><label>YouTube<input name="youtube" type="url" placeholder="https://…" value="${escapeHtml(socials.youtube || '')}"></label><label class="toggle"><input name="isPublic" type="checkbox" ${p.isPublic ? 'checked' : ''}> Afficher mon profil dans l’annuaire public</label><p id="form-message" class="message"></p><button class="primary" type="submit">Enregistrer mon profil</button></form></div>`;
-  app.querySelector('#back').addEventListener('click', () => { editing = false; renderDashboard(); });
+  <form id="profile-form" class="card form"><label>Alias public<input name="alias" value="${escapeHtml(p.alias || '')}" required></label><label>Ville<input name="city" value="${escapeHtml(p.city || '')}"></label>${gameFields(p)}<label>Site Web<input name="website" type="url" placeholder="https://…" value="${escapeHtml(socials.website || '')}"></label><label>Instagram<input name="instagram" type="url" placeholder="https://…" value="${escapeHtml(socials.instagram || '')}"></label><label>TikTok<input name="tiktok" type="url" placeholder="https://…" value="${escapeHtml(socials.tiktok || '')}"></label><label>YouTube<input name="youtube" type="url" placeholder="https://…" value="${escapeHtml(socials.youtube || '')}"></label><label class="toggle"><input name="isPublic" type="checkbox" ${p.isPublic ? 'checked' : ''}> Afficher mon profil dans l’annuaire public</label><p id="form-message" class="message" role="status" tabindex="-1"></p><button class="primary" type="submit">Enregistrer mon profil</button></form></div>`;
+  app.querySelector('#back').addEventListener('click', () => { if (savingProfile) return; editing = false; transport.editing(false); renderDashboard(); });
   app.querySelector('#profile-form').addEventListener('submit', saveProfile);
 }
 function saveProfile(event) {
   event.preventDefault();
+  if (savingProfile) return;
   const form = new FormData(event.currentTarget);
   const socials = ['website', 'instagram', 'tiktok', 'youtube'].map(platform => ({ platform, url: text(form.get(platform), 500) })).filter(link => /^https:\/\//.test(link.url));
   const payload = { ...data.profile, alias: text(form.get('alias'), 100), city: text(form.get('city'), 150), isPublic: form.get('isPublic') === 'on', games: form.getAll('games'), socials };
   if (!payload.games.length) { app.querySelector('#form-message').textContent = 'Choisissez au moins un jeu.'; return; }
   if (isPreview()) { data.profile = payload; editing = false; renderDashboard(); return; }
-  window.parent.postMessage({ type: MESSAGE.save, payload }, '*');
+  if (!transport.save(payload)) return;
+  savingProfile = true; app.querySelector('[type=submit]').disabled = true;
   app.querySelector('#form-message').textContent = 'Enregistrement…';
 }
 function renderConnectionMessage() {
@@ -95,9 +111,7 @@ function startPrivateProfile() {
   if (!embedded) return renderConnectionMessage();
   window.addEventListener('message', event => {
     if (event.source !== window.parent || !event.data || typeof event.data !== 'object') return;
-    if (event.data.type === MESSAGE.data) { clearTimeout(loadTimer); data = normalized(event.data.payload); renderDashboard(); }
-    if (event.data.type === MESSAGE.saved) { editing = false; requestData(); }
-    if (event.data.type === MESSAGE.error) app.innerHTML = `<div class="shell center"><div class="card"><h1>Impossible de charger le profil</h1><p>${escapeHtml(event.data.message || 'Réessayez plus tard.')}</p></div></div>`;
+    transport.receive(event.data);
   });
   window.parent.postMessage({ type: MESSAGE.ready }, '*'); requestData();
   loadTimer = setTimeout(renderConnectionMessage, 9000);
