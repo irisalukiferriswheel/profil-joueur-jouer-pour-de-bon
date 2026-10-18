@@ -17,7 +17,16 @@ async function load(){
  try{const result=await request('list');
   if(started!==generation)return;
   if(!result?.success){box.hidden=true;return;}
+  // Host obtains the optional invitation ID from its own URL. This is read-only.
+  const linked=await request('detail');if(started!==generation)return;
+  const detail=linked?.success&&linked.data?.invitationId?linked.data:null;
+  if(detail&&!result.data.items.some(item=>item.invitationId===detail.invitationId)){
+   result.data.items.unshift({invitationId:detail.invitationId,eventId:detail.eventId,title:detail.event?.title||'',
+    status:detail.status,availability:detail.availability,isNew:!detail.readAt,
+    canAccept:detail.canAccept,canDecline:detail.canDecline});
+  }
   render(result.data);
+  if(detail){const target=[...box.querySelectorAll('[data-invitation]')].find(n=>n.dataset.invitation===detail.invitationId);target?.focus({preventScroll:true});}
  }catch{message(t('Invitations indisponibles. Réessayez.','Invitations unavailable. Please retry.'));}
  finally{if(started===generation)busy=false;}
 }
@@ -29,7 +38,7 @@ function render(data){
  box.append(node('p',t(`${data.unreadCount} non lues · ${data.pendingCount} en attente`,`${data.unreadCount} unread · ${data.pendingCount} pending`)));
  const status=node('p','');status.setAttribute('role','status');status.tabIndex=-1;box.append(status);
  for(const item of data.items||[]){
-  const card=node('article','');card.className='card';card.append(node('h3',item.title));
+  const card=node('article','');card.className='card';card.dataset.invitation=item.invitationId;card.tabIndex=-1;card.append(node('h3',item.title));
   const labels={pending:t('En attente','Pending'),full:t('Complet','Full'),expired:t('Expirée','Expired'),unavailable:t('Indisponible','Unavailable'),accepted:t('Acceptée','Accepted'),declined:t('Refusée','Declined'),revoked:t('Révoquée','Revoked')};
   card.append(node('p',labels[item.availability]||t('Indisponible','Unavailable')));
   for(const [action,label,allowed] of [['read',t('Marquer comme lue','Mark as read'),item.isNew],['accepted',t('Accepter','Accept'),item.canAccept],['declined',t('Refuser','Decline'),item.canDecline]]){
@@ -45,6 +54,10 @@ function render(data){
     }catch{message(t('Action non confirmée. Rechargez les invitations avant de réessayer.','Action not confirmed. Reload invitations before retrying.'));button.disabled=false;}
     finally{if(started===generation)busy=false;}
    };card.append(button);
+  }
+  if(item.status==='accepted'&&typeof item.eventId==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.eventId)){
+   const link=node('a',t("Continuer l'inscription",'Continue registration'));
+   link.href='https://www.jouerpourdebon.ca/inscription?jpdbEvent='+encodeURIComponent(item.eventId);link.target='_top';card.append(link);
   }
   box.append(card);
  }
