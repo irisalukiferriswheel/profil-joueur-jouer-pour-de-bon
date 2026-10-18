@@ -4,7 +4,7 @@ document.documentElement.lang = en ? 'en' : 'fr';
 const t = (fr, english) => en ? english : fr;
 const games = [{slug:'chess',nameFr:'Échecs',nameEn:'Chess'},{slug:'basketball',nameFr:'Basketball',nameEn:'Basketball'},{slug:'pickleball',nameFr:'Pickleball',nameEn:'Pickleball'}];
 // Fictional fixture catalog, not an authoritative production location source.
-const cities = [{id:'demo-sherbrooke',label:'Sherbrooke, Québec, Canada'},{id:'demo-montreal',label:'Montréal, Québec, Canada'},{id:'demo-quebec',label:'Québec, Québec, Canada'}];
+const cities = ['Sherbrooke', 'Montréal', 'Québec']; // Fixture values shaped like existing public_player_filters().cities.
 let profile = null;
 let authenticated = false;
 const flow = createSignupFlow({
@@ -25,17 +25,17 @@ function show(result) {
   } else editor();
 }
 function editor() {
-  const p = profile || {alias:'',cityId:'',games:[],isPublic:false,invitationEmails:false};
-  app.innerHTML = shell(`<p>${t('2 · Votre profil joueur','2 · Your player profile')}</p><h1>${t('Faisons connaissance.','Let’s get acquainted.')}</h1><p>${t('Choisissez votre alias, votre ville et les jeux qui vous intéressent.','Choose your alias, your city and the games you enjoy.')}</p><form class="card form" id="basics"><label>${t('Alias / nom affiché','Alias / display name')}<input name="alias" required maxlength="100" autocomplete="nickname"></label><label>${t('Ville','City')}<select name="cityId" required><option value="">${t('Choisir une ville','Choose a city')}</option>${cities.map(c=>`<option value="${c.id}">${c.label}</option>`).join('')}</select></label><fieldset class="game-fields"><legend>${t('Jeux qui m’intéressent','Game interests')}</legend>${games.map(g=>`<label class="toggle"><input type="checkbox" name="games" value="${g.slug}"> ${en?g.nameEn:g.nameFr}</label>`).join('')}</fieldset><label class="toggle"><input name="isPublic" type="checkbox"> ${t('Afficher mon profil dans l’annuaire','Show my profile in the directory')}</label><p class="note wide">${t('Mon alias, ma ville et mes jeux seront visibles. Mon courriel reste privé.','My alias, city and games will be visible. My email stays private.')}</p><label class="toggle"><input name="invitationEmails" type="checkbox"> ${t('Recevoir les invitations à des événements par courriel','Receive event invitations by email')}</label><p class="note wide">${t('Ces deux choix sont indépendants et modifiables en tout temps.','These choices are independent and can be changed at any time.')}</p><p id="status" class="message" role="status" tabindex="-1"></p><button type="submit" class="primary">${t('Enregistrer mon profil','Save my profile')}</button></form>`);
+  const p = profile || {alias:'',city:'',games:[],isPublic:false,invitationEmails:false};
+  app.innerHTML = shell(`<p>${t('2 · Votre profil joueur','2 · Your player profile')}</p><h1>${t('Faisons connaissance.','Let’s get acquainted.')}</h1><p>${t('Choisissez votre alias, votre ville et les jeux qui vous intéressent.','Choose your alias, your city and the games you enjoy.')}</p><form class="card form" id="basics"><label>${t('Alias / nom affiché','Alias / display name')}<input name="alias" required maxlength="100" autocomplete="nickname"></label><label>${t('Ville','City')}<select name="city" required><option value="">${t('Choisir une ville','Choose a city')}</option>${cities.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></label><fieldset class="game-fields"><legend>${t('Jeux qui m’intéressent','Game interests')}</legend>${games.map(g=>`<label class="toggle"><input type="checkbox" name="games" value="${g.slug}"> ${en?g.nameEn:g.nameFr}</label>`).join('')}</fieldset><label class="toggle"><input name="isPublic" type="checkbox"> ${t('Afficher mon profil dans l’annuaire','Show my profile in the directory')}</label><p class="note wide">${t('Mon alias, ma ville et mes jeux seront visibles. Mon courriel reste privé.','My alias, city and games will be visible. My email stays private.')}</p><label class="toggle"><input name="invitationEmails" type="checkbox"> ${t('Recevoir les invitations à des événements par courriel','Receive event invitations by email')}</label><p class="note wide">${t('Ces deux choix sont indépendants et modifiables en tout temps.','These choices are independent and can be changed at any time.')}</p><p id="status" class="message" role="status" tabindex="-1"></p><button type="submit" class="primary">${t('Enregistrer mon profil','Save my profile')}</button></form>`);
   const form = app.querySelector('form');
   form.elements.alias.value = p.alias;
-  form.elements.cityId.value = p.cityId;
+  form.elements.city.value = p.city;
   form.elements.isPublic.checked = p.isPublic;
   form.elements.invitationEmails.checked = p.invitationEmails;
   form.querySelectorAll('[name=games]').forEach(el=>el.checked=p.games.includes(el.value));
   form.onsubmit = async event => {
     event.preventDefault(); const fields = new FormData(form);
-    const input = {alias:fields.get('alias'),cityId:fields.get('cityId'),games:fields.getAll('games'),isPublic:fields.has('isPublic'),invitationEmails:fields.has('invitationEmails')};
+    const input = {alias:fields.get('alias'),city:fields.get('city'),games:fields.getAll('games'),isPublic:fields.has('isPublic'),invitationEmails:fields.has('invitationEmails')};
     const button = form.querySelector('[type=submit]'); button.disabled = true;
     const result = await flow.save(input); button.disabled = false;
     if (result.state === 'complete') show(result);

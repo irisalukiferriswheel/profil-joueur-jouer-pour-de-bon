@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createSignupFlow, validateBasics, gameSlugs} from './profile-fields.js';
-const games=[{slug:'chess'}], cities=[{id:'city-1'}];
-const input={alias:' Alice ',cityId:'city-1',games:['chess','chess'],wixMemberId:'forged',email:'forged',role:'admin'};
+const games=[{slug:'chess'}], cities=['Sherbrooke'];
+const input={alias:' Alice ',city:'Sherbrooke',games:['chess','chess'],wixMemberId:'forged',email:'forged',role:'admin'};
 function harness(options={}) {
   let profile=options.profile || null, calls=0, loggedIn=options.loggedIn ?? true;
   const flow=createSignupFlow({
@@ -14,10 +14,10 @@ function harness(options={}) {
 }
 test('strict catalog validation, normalization, ownership projection and independent opt-ins',()=>{
   const result=validateBasics(input,games,cities).value;
-  assert.deepEqual(result,{alias:'Alice',cityId:'city-1',games:['chess'],isPublic:false,invitationEmails:false});
+  assert.deepEqual(result,{alias:'Alice',city:'Sherbrooke',games:['chess'],isPublic:false,invitationEmails:false});
   assert.equal(validateBasics({...input,isPublic:true},games,cities).value.invitationEmails,false);
   assert.equal(validateBasics({...input,invitationEmails:true},games,cities).value.isPublic,false);
-  for(const bad of [{alias:''},{alias:'a'.repeat(101)},{cityId:'invented'},{games:[]},{games:['invented']}]) assert.ok(validateBasics({...input,...bad},games,cities).code);
+  for(const bad of [{alias:''},{alias:'a'.repeat(101)},{city:'invented'},{games:[]},{games:['invented']}]) assert.ok(validateBasics({...input,...bad},games,cities).code);
   assert.deepEqual(gameSlugs(['chess',{slug:'chess'}]),['chess']);
 });
 test('signup success creates profile and completed members resume without another save',async()=>{

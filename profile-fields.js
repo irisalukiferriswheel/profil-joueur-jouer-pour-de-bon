@@ -7,9 +7,9 @@ export function validateBasics(input, games, cities) {
   if (!alias || alias.length > 100) return { code: 'ALIAS_REQUIRED' };
   const selected = gameSlugs(input.games);
   if (!selected.length || selected.length > 50 || selected.some(slug => !games.some(game => game.slug === slug))) return { code: 'GAMES_REQUIRED' };
-  const city = cities.find(city => city.id === input.cityId);
+  const city = cities.find(city => city === input.city);
   if (!city) return { code: 'CITY_REQUIRED' };
-  return { value: { alias, cityId: city.id, games: selected, isPublic: input.isPublic === true, invitationEmails: input.invitationEmails === true } };
+  return { value: { alias, city, games: selected, isPublic: input.isPublic === true, invitationEmails: input.invitationEmails === true } };
 }
 
 // Authentication is supplied by Wix. Never store or receive passwords here.
