@@ -1,3 +1,4 @@
+import {mountEventReturn} from './event-return.js';
 import {renderShortSignup} from './short-signup.js';
 import { createProfileEditTransport } from './profile-edit-transport.js';
 const app = document.querySelector('#app');
@@ -22,9 +23,10 @@ let editing = false;
 let embedded = window.parent !== window;
 let loadTimer;
 let savingProfile = false;
+let canContinueToEvent = false;
 const transport = createProfileEditTransport({
  send: message => window.parent.postMessage(message, '*'),
- onData: message => { clearTimeout(loadTimer); data = normalized(message.payload); if (data.shortSignup) { transport.editing(true); renderShortSignup({app,data,send:message=>window.parent.postMessage(message,'*'),save:payload=>{ if(savingProfile || !transport.save(payload,'JPDB_PROFILE_BASIC_SAVE'))return; savingProfile=true; app.querySelector('[type=submit]').disabled=true; }}); } else renderDashboard(); },
+ onData: message => { clearTimeout(loadTimer); data = normalized(message.payload); canContinueToEvent = message.canContinueToEvent === true && data.complete === true; if (data.shortSignup) { transport.editing(true); renderShortSignup({app,data,send:message=>window.parent.postMessage(message,'*'),save:payload=>{ if(savingProfile || !transport.save(payload,'JPDB_PROFILE_BASIC_SAVE'))return; savingProfile=true; app.querySelector('[type=submit]').disabled=true; }}); } else renderDashboard(); },
  onSaved: () => { savingProfile = false; editing = false; requestData(); },
  onError: code => {
   savingProfile = false;
@@ -79,6 +81,7 @@ function renderDashboard() {
     <p class="note">Les parties, victoires et contributions proviennent des données confirmées. Elles ne sont pas modifiables ici.</p>
   </div>`;
   app.querySelector('#edit').addEventListener('click', renderEditor);
+  mountEventReturn(app, canContinueToEvent, message => window.parent.postMessage(message, '*'));
 }
 function renderEditor() {
   editing = true; transport.editing(true);
@@ -102,6 +105,7 @@ function saveProfile(event) {
   app.querySelector('#form-message').textContent = 'Enregistrement…';
 }
 function renderConnectionMessage() {
+  mountEventReturn(app, false);
   app.innerHTML = `<div class="shell center"><div class="card"><div class="eyebrow">Mon profil joueur</div><h1>Connexion requise</h1><p>Ouvrez votre profil depuis votre compte Jouer pour de bon afin de voir vos données personnelles.</p><a class="primary" href="#/preview-profile">Voir l’aperçu du profil</a></div></div>`;
 }
 function requestData() { window.parent.postMessage({ type: MESSAGE.request }, '*'); }
