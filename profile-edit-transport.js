@@ -18,7 +18,7 @@ export function createProfileEditTransport({ send, onData, onSaved, onError, onS
       if (ended) return;
       if (message.type === 'JPDB_PROFILE_EDITOR_DATA' && !editing && !pending) onData(message);
       if (message.type === 'JPDB_PROFILE_EDITOR_SAVED' && pending && message.requestId === pending) { reset(); editing = false; onSaved(message); }
-      if (message.type === 'JPDB_PROFILE_EDITOR_ERROR' && (!message.requestId || message.requestId === pending)) { reset(); onError(message.code || 'SAVE_FAILED'); }
+      if (message.type === 'JPDB_PROFILE_EDITOR_ERROR' && (message.requestId ? message.requestId === pending : !pending)) { reset(); onError(message.code || 'SAVE_FAILED'); }
     }
   };
 }

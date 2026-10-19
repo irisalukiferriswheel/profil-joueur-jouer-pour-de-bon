@@ -5,6 +5,9 @@ test('save correlation rejects duplicates and stale acknowledgements; session en
  const t=createProfileEditTransport({send:m=>sent.push(m),onData:m=>data.push(m),onSaved:()=>saved++,onError:c=>errors.push(c),onSessionEnded:()=>ended++});
  t.editing(true);assert.equal(t.save({alias:'fixture'}),true);assert.equal(t.save({alias:'duplicate'}),false);
  t.receive({type:'JPDB_PROFILE_EDITOR_SAVED',requestId:'stale'});assert.equal(saved,0);
+ t.receive({type:'JPDB_PROFILE_EDITOR_ERROR',code:'LATE_LOAD_ERROR'});
+ t.receive({type:'JPDB_PROFILE_EDITOR_ERROR',requestId:'stale',code:'STALE_SAVE_ERROR'});
+ assert.deepEqual(errors,[]);assert.equal(t.save({alias:'still pending'}),false);
  t.receive({type:'JPDB_PROFILE_EDITOR_DATA',payload:{alias:'stale'}});assert.equal(data.length,0);
  t.receive({type:'JPDB_PROFILE_EDITOR_ERROR',requestId:sent[0].requestId,code:'SAVE_FAILED'});assert.deepEqual(errors,['SAVE_FAILED']);
  assert.equal(t.save({alias:'retry'}),true);t.receive({type:'JPDB_PROFILE_EDITOR_SAVED',requestId:sent[0].requestId});assert.equal(saved,0);
