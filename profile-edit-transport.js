@@ -4,11 +4,11 @@ export function createProfileEditTransport({ send, onData, onSaved, onError, onS
   const reset = () => { clearTimeout(timer); pending = null; };
   return {
     editing(value) { editing = value; },
-    save(payload) {
+    save(payload, type = 'JPDB_PROFILE_EDITOR_SAVE') {
       if (pending || ended) return false;
       pending = crypto.randomUUID();
       timer = setTimeout(() => { reset(); onError('SAVE_UNCONFIRMED'); }, timeout);
-      send({ type: 'JPDB_PROFILE_EDITOR_SAVE', requestId: pending, payload });
+      send({ type, requestId: pending, payload });
       return true;
     },
     receive(message) {

@@ -1,0 +1,18 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');const fs=require('fs'),path=require('path'),assert=require('node:assert/strict');
+(async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{
+ const c=await b.newContext({viewport:{width:390,height:900}}),p=await c.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));
+ await c.route('https://profile.test/**',r=>{const f=new URL(r.request().url()).pathname.slice(1);return r.fulfill({body:fs.readFileSync(path.join(__dirname,'..',f)),contentType:f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html; charset=utf-8'});});
+ await c.route('https://parent.test/**',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:`<iframe style="width:100%;height:1400px;border:0" src="https://profile.test/index.html"></iframe><script>
+ window.calls=[];window.saved=false;window.fail=true;window.profile=null;window.reply=m=>document.querySelector('iframe').contentWindow.postMessage(m,'*');
+ addEventListener('message',e=>{const m=e.data;if(m.type==='JPDB_PROFILE_EDITOR_READY'||m.type==='JPDB_PROFILE_EDITOR_REQUEST_DATA')reply({type:'JPDB_PROFILE_EDITOR_DATA',payload:{shortSignup:true,profile,complete:false,basicsComplete:saved,accountReady:saved,preferences:{isPublic:false,invitationEmails:false},games:[{slug:'chess',nameFr:'Échecs',nameEn:'Chess'}]}});
+ if(m.type==='JPDB_PROFILE_BASIC_SAVE'){calls.push(m);if(fail)reply({type:'JPDB_PROFILE_EDITOR_ERROR',code:'BASIC_SAVE_UNCONFIRMED',requestId:m.requestId});else{profile=m.payload;saved=true;reply({type:'JPDB_PROFILE_EDITOR_SAVED',requestId:m.requestId});}}
+ if(m.type==='JPDB_PROFILE_COMPLETE_ELIGIBILITY')calls.push(m);
+ });</script>`}));
+ await p.goto('https://parent.test/');const f=p.frameLocator('iframe');await f.locator('[name=alias]').fill('Fixture');await f.locator('[name=city]').fill('Sherbrooke');assert.equal(await f.locator('[name=isPublic]').isChecked(),false);assert.equal(await f.locator('[name=invitationEmails]').isChecked(),false);
+ await f.locator('[type=submit]').click();assert.match(await f.locator('#form-message').innerText(),/au moins/);await f.locator('[name=games]').check();await f.locator('[type=submit]').click();await f.locator('#form-message').filter({hasText:'conservés'}).waitFor();assert.equal(await f.locator('[name=alias]').inputValue(),'Fixture');
+ await f.locator('#signup-language').selectOption('en');assert.match(await f.locator('h1').innerText(),/player profile/);assert.equal(await f.locator('[name=alias]').inputValue(),'Fixture');assert.equal(await f.locator('[name=games]').isChecked(),true);
+ if(process.env.SCREENSHOT_DIR)await p.screenshot({path:path.join(process.env.SCREENSHOT_DIR,'short-signup-en-mobile.png'),fullPage:true});
+ await p.evaluate(()=>fail=false);await f.locator('[type=submit]').click();await f.locator('#complete-eligibility').waitFor();assert.match(await f.locator('body').innerText(),/admissibilité|eligibility/);assert.equal(await p.evaluate(()=>calls.at(-1).payload.invitationEmails),false);
+ await f.locator('#signup-language').selectOption('en');await f.locator('#complete-eligibility').click();assert.equal(await p.evaluate(()=>calls.at(-1).type),'JPDB_PROFILE_COMPLETE_ELIGIBILITY');assert.equal(await p.evaluate(()=>calls.at(-1).language),'en');
+ await p.evaluate(()=>reply({type:'JPDB_PROFILE_SESSION_ENDED'}));await f.getByRole('heading',{name:'Connexion requise'}).waitFor();assert.deepEqual(errors,[]);console.log('PASS short signup FR/EN/mobile: default-off choices, game validation, failure draft, language retention, resumable basic state, explicit full-form transition, session clearing.');
+ }finally{await b.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

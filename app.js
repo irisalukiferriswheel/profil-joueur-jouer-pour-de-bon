@@ -1,3 +1,4 @@
+import {renderShortSignup} from './short-signup.js';
 import { createProfileEditTransport } from './profile-edit-transport.js';
 const app = document.querySelector('#app');
 const MESSAGE = {
@@ -23,7 +24,7 @@ let loadTimer;
 let savingProfile = false;
 const transport = createProfileEditTransport({
  send: message => window.parent.postMessage(message, '*'),
- onData: message => { clearTimeout(loadTimer); data = normalized(message.payload); renderDashboard(); },
+ onData: message => { clearTimeout(loadTimer); data = normalized(message.payload); if (data.shortSignup) { transport.editing(true); renderShortSignup({app,data,send:message=>window.parent.postMessage(message,'*'),save:payload=>{ if(savingProfile || !transport.save(payload,'JPDB_PROFILE_BASIC_SAVE'))return; savingProfile=true; app.querySelector('[type=submit]').disabled=true; }}); } else renderDashboard(); },
  onSaved: () => { savingProfile = false; editing = false; requestData(); },
  onError: code => {
   savingProfile = false;

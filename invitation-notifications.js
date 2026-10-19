@@ -76,7 +76,7 @@ window.addEventListener('message',event=>{
  }
  if(m.type==='JPDB_PROFILE_EDITOR_DATA'){
   generation++;busy=false;box.hidden=true;box.replaceChildren();
-  if(m.publicView){box.hidden=true;return;}
+  if(m.publicView || m.payload?.shortSignup){box.hidden=true;return;}
   load();
  }
 });
