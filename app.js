@@ -17,6 +17,7 @@ const preview = {
 
 let data = null;
 let editing = false;
+let saving = false;
 let embedded = window.parent !== window;
 let loadTimer;
 
@@ -71,33 +72,53 @@ function renderEditor() {
   const socials = Object.fromEntries((p.socials || []).map(link => [link.platform, link.url]));
   app.innerHTML = `<div class="shell"><button id="back" class="link">← Retour au profil</button><header><div class="eyebrow">Espace joueur</div><h1>Modifier mon profil</h1><p>Vos coordonnées restent privées. Les liens sociaux sont facultatifs et publics.</p></header>
   <form id="profile-form" class="card form"><label>Alias public<input name="alias" value="${escapeHtml(p.alias || '')}" required></label><label>Ville<input name="city" value="${escapeHtml(p.city || '')}"></label><label>Site Web<input name="website" type="url" placeholder="https://…" value="${escapeHtml(socials.website || '')}"></label><label>Instagram<input name="instagram" type="url" placeholder="https://…" value="${escapeHtml(socials.instagram || '')}"></label><label>TikTok<input name="tiktok" type="url" placeholder="https://…" value="${escapeHtml(socials.tiktok || '')}"></label><label>YouTube<input name="youtube" type="url" placeholder="https://…" value="${escapeHtml(socials.youtube || '')}"></label><label class="toggle"><input name="isPublic" type="checkbox" ${p.isPublic ? 'checked' : ''}> Afficher mon profil dans l’annuaire public</label><p id="form-message" class="message"></p><button class="primary" type="submit">Enregistrer mon profil</button></form></div>`;
-  app.querySelector('#back').addEventListener('click', () => { editing = false; renderDashboard(); });
+  app.querySelector('#back').addEventListener('click', () => { if (saving) return; editing = false; renderDashboard(); });
   app.querySelector('#profile-form').addEventListener('submit', saveProfile);
 }
 function saveProfile(event) {
   event.preventDefault();
+  if (saving) return;
   const form = new FormData(event.currentTarget);
   const socials = ['website', 'instagram', 'tiktok', 'youtube'].map(platform => ({ platform, url: text(form.get(platform), 500) })).filter(link => /^https:\/\//.test(link.url));
-  const payload = { ...data.profile, alias: text(form.get('alias'), 100), city: text(form.get('city'), 150), isPublic: form.get('isPublic') === 'on', socials };
+  // The onboarding response contains game objects; both Wix save bridges accept slugs.
+  const games = (Array.isArray(data.profile.games) ? data.profile.games : [])
+    .map(game => text(typeof game === 'string' ? game : game?.slug, 100))
+    .filter(Boolean);
+  const payload = { ...data.profile, games, alias: text(form.get('alias'), 100), city: text(form.get('city'), 150), isPublic: form.get('isPublic') === 'on', socials };
   if (isPreview()) { data.profile = payload; editing = false; renderDashboard(); return; }
-  window.parent.postMessage({ type: MESSAGE.save, payload }, '*');
+  saving = true;
+  app.querySelector('#profile-form button[type="submit"]').disabled = true;
+  app.querySelector('#back').disabled = true;
   app.querySelector('#form-message').textContent = 'Enregistrement…';
+  window.parent.postMessage({ type: MESSAGE.save, payload }, '*');
 }
 function renderConnectionMessage() {
   app.innerHTML = `<div class="shell center"><div class="card"><div class="eyebrow">Mon profil joueur</div><h1>Connexion requise</h1><p>Ouvrez votre profil depuis votre compte Jouer pour de bon afin de voir vos données personnelles.</p><a class="primary" href="#/preview-profile">Voir l’aperçu du profil</a></div></div>`;
+}
+function renderLoadTimeout() {
+  app.innerHTML = `<div class="shell center"><div class="card"><div class="eyebrow">Mon profil joueur</div><h1>Chargement du profil interrompu</h1><p>Les données du profil ne sont pas encore disponibles. Cela ne signifie pas que vous êtes déconnecté. Vous pouvez recharger cette page pour réessayer.</p></div></div>`;
 }
 function requestData() { window.parent.postMessage({ type: MESSAGE.request }, '*'); }
 function startPrivateProfile() {
   if (!embedded) return renderConnectionMessage();
   window.addEventListener('message', event => {
     if (event.source !== window.parent || !event.data || typeof event.data !== 'object') return;
-    if (event.data.type === MESSAGE.data) { clearTimeout(loadTimer); data = normalized(event.data.payload); renderDashboard(); }
-    if (event.data.type === MESSAGE.saved) { editing = false; requestData(); }
-    if (event.data.type === MESSAGE.error) app.innerHTML = `<div class="shell center"><div class="card"><h1>Impossible de charger le profil</h1><p>${escapeHtml(event.data.message || 'Réessayez plus tard.')}</p></div></div>`;
+    if (event.data.type === MESSAGE.data && !editing) { clearTimeout(loadTimer); data = normalized(event.data.payload); renderDashboard(); }
+    if (event.data.type === MESSAGE.saved) { saving = false; editing = false; requestData(); }
+    if (event.data.type === MESSAGE.error) {
+      clearTimeout(loadTimer);
+      if (editing) {
+        saving = false;
+        app.querySelector('#profile-form button[type="submit"]').disabled = false;
+        app.querySelector('#back').disabled = false;
+        app.querySelector('#form-message').textContent = 'Impossible d’enregistrer le profil. Vos modifications sont conservées ici. Réessayez après vérification.';
+        return;
+      }
+      app.innerHTML = `<div class="shell center"><div class="card"><h1>Impossible de charger le profil</h1><p>${escapeHtml(event.data.message || 'Réessayez plus tard.')}</p></div></div>`;
+    }
   });
   window.parent.postMessage({ type: MESSAGE.ready }, '*'); requestData();
-  loadTimer = setTimeout(renderConnectionMessage, 9000);
+  loadTimer = setTimeout(renderLoadTimeout, 9000);
 }
 
 if (isPreview()) { data = normalized(preview); renderDashboard(); } else startPrivateProfile();
-
