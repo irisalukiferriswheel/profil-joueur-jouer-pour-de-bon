@@ -86,6 +86,9 @@ function saveProfile(event) {
 function renderConnectionMessage() {
   app.innerHTML = `<div class="shell center"><div class="card"><div class="eyebrow">Mon profil joueur</div><h1>Connexion requise</h1><p>Ouvrez votre profil depuis votre compte Jouer pour de bon afin de voir vos données personnelles.</p><a class="primary" href="#/preview-profile">Voir l’aperçu du profil</a></div></div>`;
 }
+function renderLoadTimeout() {
+  app.innerHTML = `<div class="shell center"><div class="card"><div class="eyebrow">Mon profil joueur</div><h1>Chargement du profil interrompu</h1><p>Les données du profil ne sont pas encore disponibles. Cela ne signifie pas que vous êtes déconnecté. Vous pouvez recharger cette page pour réessayer.</p></div></div>`;
+}
 function requestData() { window.parent.postMessage({ type: MESSAGE.request }, '*'); }
 function startPrivateProfile() {
   if (!embedded) return renderConnectionMessage();
@@ -93,11 +96,13 @@ function startPrivateProfile() {
     if (event.source !== window.parent || !event.data || typeof event.data !== 'object') return;
     if (event.data.type === MESSAGE.data) { clearTimeout(loadTimer); data = normalized(event.data.payload); renderDashboard(); }
     if (event.data.type === MESSAGE.saved) { editing = false; requestData(); }
-    if (event.data.type === MESSAGE.error) app.innerHTML = `<div class="shell center"><div class="card"><h1>Impossible de charger le profil</h1><p>${escapeHtml(event.data.message || 'Réessayez plus tard.')}</p></div></div>`;
+    if (event.data.type === MESSAGE.error) {
+      clearTimeout(loadTimer);
+      app.innerHTML = `<div class="shell center"><div class="card"><h1>Impossible de charger le profil</h1><p>${escapeHtml(event.data.message || 'Réessayez plus tard.')}</p></div></div>`;
+    }
   });
   window.parent.postMessage({ type: MESSAGE.ready }, '*'); requestData();
-  loadTimer = setTimeout(renderConnectionMessage, 9000);
+  loadTimer = setTimeout(renderLoadTimeout, 9000);
 }
 
 if (isPreview()) { data = normalized(preview); renderDashboard(); } else startPrivateProfile();
-
