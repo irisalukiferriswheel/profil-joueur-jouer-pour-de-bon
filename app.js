@@ -78,7 +78,11 @@ function saveProfile(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const socials = ['website', 'instagram', 'tiktok', 'youtube'].map(platform => ({ platform, url: text(form.get(platform), 500) })).filter(link => /^https:\/\//.test(link.url));
-  const payload = { ...data.profile, alias: text(form.get('alias'), 100), city: text(form.get('city'), 150), isPublic: form.get('isPublic') === 'on', socials };
+  // The onboarding response contains game objects; both Wix save bridges accept slugs.
+  const games = (Array.isArray(data.profile.games) ? data.profile.games : [])
+    .map(game => text(typeof game === 'string' ? game : game?.slug, 100))
+    .filter(Boolean);
+  const payload = { ...data.profile, games, alias: text(form.get('alias'), 100), city: text(form.get('city'), 150), isPublic: form.get('isPublic') === 'on', socials };
   if (isPreview()) { data.profile = payload; editing = false; renderDashboard(); return; }
   window.parent.postMessage({ type: MESSAGE.save, payload }, '*');
   app.querySelector('#form-message').textContent = 'Enregistrement…';
@@ -100,4 +104,3 @@ function startPrivateProfile() {
 }
 
 if (isPreview()) { data = normalized(preview); renderDashboard(); } else startPrivateProfile();
-
