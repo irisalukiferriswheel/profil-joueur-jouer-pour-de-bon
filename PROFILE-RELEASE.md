@@ -4,7 +4,7 @@
 
 Combines the timeout/error correction from PR #5, the game-slug save correction from PR #6, and focused pending-save/error-state protection. No Wix backend, database, authentication, mandatory field, or deployment configuration changes. Preserve typed fields in the same open form after a host error; prevent repeated submits and Back while a save is pending; ignore late load data during edits. The browser guard is not a replacement for server idempotency or transactional persistence.
 
-Fourteen deterministic local tests cover these behaviors. They use synthetic data and a minimal DOM model; they are not browser visual QA or live end-to-end proof. A save acknowledgment still comes from the host, followed by a new host data request. This client cannot independently prove that a database transaction committed. It does not show optimistic saved data.
+Forty deterministic local tests cover these behaviors. They use synthetic data and a minimal DOM model; they are not browser visual QA or live end-to-end proof. A save acknowledgment still comes from the host, followed by a new host data request. This client cannot independently prove that a database transaction committed. It does not show optimistic saved data.
 
 The existing Pages workflow deploys on any push to main or manual dispatch. Do not merge this candidate, PR #5, or PR #6 without release approval. Use this combined candidate instead of merging the two individual changes separately.
 
