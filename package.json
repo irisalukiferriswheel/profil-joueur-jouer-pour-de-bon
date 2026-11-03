@@ -1,0 +1,10 @@
+{
+  "name": "jpdb-profile-regression-tests",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/profile-*.cjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8"
+  }
+}
