@@ -67,15 +67,24 @@ function databaseClient(db, fault) {
   } };
 }
 
-async function harness(t) {
+async function harness(t, atomic = false) {
   const db = new PGlite();
   t.after(() => db.close());
   await db.exec(fixture('profile-reduced-schema.sql'));
+  if (atomic) await db.exec(fixture('player-onboarding-atomic.sql'));
   const fault = {}, routes = {}, calls = [];
-  const api = { hasValidWixIntegrationKey: key => key === 'synthetic-key' };
-  const source = stripTypeScriptTypes(fixture('api-main-player-onboarding.ts').replace(/^import .*;\r?\n/gm, '')).replace('export async function', 'async function');
+  const api = { hasValidWixIntegrationKey: key => key === 'synthetic-key', process: { env: { JPDB_ATOMIC_ONBOARDING_ENABLED: atomic ? 'true' : undefined } } };
+  const source = stripTypeScriptTypes(fixture(atomic ? 'api-atomic-player-onboarding.ts' : 'api-main-player-onboarding.ts').replace(/^import .*;\r?\n/gm, '')).replace('export async function', 'async function');
   vm.runInNewContext(source + '\nglobalThis.register = registerPlayerOnboardingRoutes;', api);
-  await api.register({ supabase: databaseClient(db, fault), get: (url, fn) => routes['GET ' + url] = fn, post: (url, fn) => routes['POST ' + url] = fn });
+  const client = databaseClient(db, fault);
+  client.rpc = async (name, args) => {
+    assert.equal(name, 'save_player_onboarding_atomic');
+    try {
+      const result = await db.query('SELECT public.save_player_onboarding_atomic($1::jsonb,$2::text[],$3::text) AS value', [JSON.stringify(args.p_profile), args.p_game_slugs, args.p_suggested_game]);
+      return { data: result.rows[0].value, error: null };
+    } catch (error) { return { data: null, error: { code: error.code } }; }
+  };
+  await api.register({ supabase: client, get: (url, fn) => routes['GET ' + url] = fn, post: (url, fn) => routes['POST ' + url] = fn });
   async function request(method, url, body, key = 'synthetic-key') {
     const parsed = new URL(url, 'https://fixture.invalid');
     calls.push(method + ' ' + parsed.pathname);
@@ -156,4 +165,29 @@ test('characterization: current API main can partially save before game insertio
   assert.equal((await h.db.query('SELECT alias FROM players')).rows[0].alias, h.fields.alias);
   assert.equal((await h.db.query('SELECT count(*)::integer AS n FROM player_games')).rows[0].n, 0);
   // This passing characterization exposes an unresolved atomicity defect, not a pass for production.
+});
+
+test('narrow atomic candidate: same form/Wix/API path saves and reloads essential fields', async t => {
+  const h = await harness(t, true);
+  const before = (await h.db.query('SELECT id FROM players')).rows[0].id;
+  h.submit(); await h.drain();
+  const fresh = await h.wix.load();
+  assert.equal(fresh.profile.alias, h.fields.alias);
+  assert.equal(fresh.profile.city, h.fields.city);
+  assert.equal(fresh.profile.isPublic, true);
+  assert.equal(fresh.profile.games[0].slug, 'chess');
+  assert.equal((await h.db.query('SELECT id FROM players')).rows[0].id, before);
+  assert.match(h.app.innerHTML, /Saved synthetic alias/);
+});
+
+test('narrow atomic candidate: SQL game-link failure rolls back profile and links through form path', async t => {
+  const h = await harness(t, true);
+  const before = (await h.db.query('SELECT * FROM players')).rows;
+  const links = (await h.db.query('SELECT * FROM player_games')).rows;
+  await h.db.exec("CREATE FUNCTION reject_test_game() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic failure'; END $$; CREATE TRIGGER reject_test_game BEFORE INSERT ON player_games FOR EACH ROW EXECUTE FUNCTION reject_test_game();");
+  h.submit(); await h.drain();
+  assert.equal(h.hostSent.some(m => m.type === 'JPDB_PROFILE_EDITOR_SAVED'), false);
+  assert.deepEqual((await h.db.query('SELECT * FROM players')).rows, before);
+  assert.deepEqual((await h.db.query('SELECT * FROM player_games')).rows, links);
+  assert.equal((await h.wix.load()).profile.alias, complete.alias);
 });

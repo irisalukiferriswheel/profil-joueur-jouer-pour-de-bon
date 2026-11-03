@@ -47,6 +47,22 @@ links. A passing characterization is **not** atomicity approval. Review the
 existing atomic-save proposal and its schema prerequisites in an approved staging
 target; do not silently deploy the disabled recovery branch or apply old migrations.
 
+A narrow backend repair is now prepared locally at API commit
+`dcbf365fc2b0909b28203c8089c5e498ac8b4172`, branch
+`fix/essential-profile-atomic-save`. It extracts only the atomic mutation path
+onto current main, preserving the current read contract. The two added atomic
+form-path tests use exact copies of that route and SQL proposal: successful
+save/readback and a SQL-triggered insertion failure that leaves the original
+profile and game links intact. The proposal remains unapplied and the API flag
+remains off. Deploying that API alone would block saves.
+
+All **46 profile tests** pass locally, including six SQL-backed path tests.
+The narrow API candidate passes **220 API tests**, **9 SQL tests**, typecheck
+and build. PGlite is an actual local SQL engine with synthetic rows; transport,
+managed authentication and reduced schema limitations above still apply.
+Remote publication was rejected by automatic approval review pending explicit
+parent verification of the destination. These new commits have no remote CI yet.
+
 ## Actual database evidence and remaining gates
 
 The local conversation `01a15c27-f0f8-7432-8b24-6f59ea068839` completed its October

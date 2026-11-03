@@ -21,3 +21,10 @@ PGlite. Only SQL runs against a database; Wix auth, DOM, HTTP and PostgREST are
 substitutes. No credentials, remote writes or production schema changes are used.
 The current-main partial-save characterization intentionally documents a defect.
 See ESSENTIAL-PERSISTENCE-QUALIFICATION.md for remaining production gates.
+
+- api-atomic-player-onboarding.ts and player-onboarding-atomic.sql: narrow API
+  candidate dcbf365fc2b0909b28203c8089c5e498ac8b4172 on
+  fix/essential-profile-atomic-save, src/routes/player-onboarding.ts and
+  docs/proposals/player-onboarding-atomic.sql respectively. These fixtures test
+  an unapplied candidate, not current main. The SQL is installed only inside
+  the synthetic PGlite test database.
